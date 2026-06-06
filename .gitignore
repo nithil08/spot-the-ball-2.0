@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Secrets — Week 7+ will introduce these for the VLM eval
+.env
+.env.*
+!.env.example
+
+# Generated stimuli (kept out of git; share via Drive/S3/git-lfs if needed)
+experiments/clips/
+experiments/stimuli/
+experiments/asset_bundles/
+experiments/rollout_*.json
+experiments/nithil_work/_work/
+experiments/nithil_work/_work/
+
+# Per-stimulus work dirs (intermediate avi + dumps)
+**/_work/
+**/_work_*/
+
+# Auto-generated scenario modules (cheap to regenerate, noisy as commits)
+football/gfootball/scenarios/x_*.py
+football/build/lib.macosx-26.0-arm64-cpython-314/gfootball/scenarios/x_*.py
+
+# Compiled simulator — platform-specific, must be rebuilt per machine
+football/build/
+
+# Nested git repo and venvs that shouldn't ride along
+football/.git/
+football/.venv*/
+football/.gfootball.egg-info/
+
+# Engine static libs (Mac-built, useless on Windows/Linux; regenerable)
+football/third_party/gfootball_engine/*.a
+football/third_party/gfootball_engine/*.so
+football/third_party/gfootball_engine/*.dylib
+
+# Game data (32MB+ textures) — pip install gfootball provides this
+football/third_party/gfootball_engine/data/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Big binaries that should never be committed
+*.avi
+*.mov
+*.dump
