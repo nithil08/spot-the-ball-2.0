@@ -134,6 +134,74 @@ def run_clip(env, steps: int = CLIP_STEPS, dump_name: str = "clip"):
     return {"steps_run": i + (0 if done else 1), "done": done, "obs": last_obs}
 
 
+def run_clip_capture(env, steps: int = CLIP_STEPS, dump_name: str = "clip"):
+    """Like run_clip but also captures rendered RGB frames at every step.
+
+    Use this on Windows where the gfootball MJPEG VideoWriter is broken.
+    Returns the same dict as run_clip plus a 'frames' key with a list of
+    (H, W, 3) uint8 arrays, one per step executed.
+    """
+    import numpy as np
+    env.reset()
+    last_obs = None
+    done = False
+    frames = []
+    for i in range(steps):
+        if done:
+            break
+        obs, _, done, _ = env.step([])
+        last_obs = obs
+        frame = env.render("rgb_array")
+        if frame is not None:
+            frames.append(np.array(frame))
+    if not done:
+        env.write_dump(dump_name)
+    return {"steps_run": i + (0 if done else 1), "done": done, "obs": last_obs,
+            "frames": frames}
+
+
+def frames_to_mov(frames: list, mov_path: Path, fps: int = FPS,
+                  crop_hud: bool = True) -> Path:
+    """Write a list of (H,W,3) RGB uint8 arrays to an H.264 MOV via ffmpeg pipe."""
+    import numpy as np
+    if not frames:
+        raise ValueError("No frames to write")
+    h, w = frames[0].shape[:2]
+    crop_args = ["-vf", _hud_crop_filter(w, h)] if crop_hud else []
+    proc = subprocess.Popen(
+        [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "rawvideo", "-vcodec", "rawvideo",
+            "-s", f"{w}x{h}", "-pix_fmt", "rgb24", "-r", str(fps),
+            "-i", "pipe:0",
+            *crop_args,
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            str(mov_path),
+        ],
+        stdin=subprocess.PIPE,
+    )
+    for f in frames:
+        proc.stdin.write(f.tobytes())
+    proc.stdin.close()
+    proc.wait()
+    if proc.returncode != 0:
+        raise RuntimeError(f"ffmpeg pipe failed (exit {proc.returncode})")
+    return mov_path
+
+
+def frame_to_png(frame, out_png: Path, crop_hud: bool = True) -> Path:
+    """Save a single (H,W,3) RGB uint8 array as a HUD-cropped PNG."""
+    import cv2
+    import numpy as np
+    img = np.array(frame)
+    if crop_hud:
+        h = img.shape[0]
+        img = img[HUD_TOP_PX: h - HUD_BOTTOM_PX, :]
+    cv2.imwrite(str(out_png), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    return out_png
+
+
 def read_dump(dump_path: Path):
     """Iterator over (frame_idx, observation) from a gfootball .dump file."""
     with open(dump_path, "rb") as f:

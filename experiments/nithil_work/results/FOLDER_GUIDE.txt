@@ -1,0 +1,72 @@
+SPOT THE BALL — CLIP RESULTS FOLDER GUIDE
+==========================================
+Project: Visual social inference benchmark using Google Research Football simulator
+Paper:   Balamurugan et al., "Spot The Ball" (arXiv:2511.00261)
+
+Each sub-folder below is a batch of video clips or still frames.
+Every folder has its own README.txt with full details.
+
+FOLDER OVERVIEW
+---------------
+ball_hidden_4s/
+  Early experiment: a single still frame captured at 4 seconds into play,
+  ball hidden using the "tiny ball" trick. Used for initial model probing.
+  NOT recommended for new experiments — superseded by ball_hidden_grid/.
+
+ball_hidden_grid/
+  3 clips showing 4 seconds of play with the ball HIDDEN (shrunk to 5% size).
+  A 32×12 alphanumeric grid is burned into every frame. Ball ground-truth
+  location is recorded in meta.json inside each sub-folder. These were used
+  for early "locate the hidden ball" probing tasks.
+
+5s_ball_visible_no_names/       ← USE THIS for 5-second visible-ball clips
+  4 clips, 5 seconds each. Ball is VISIBLE at normal size. No player name
+  labels (names suppressed by font trick — see README.txt inside).
+  32×12 grid burned on every frame.
+
+5s_visibility_splits/           ← USE THIS for split visible/hidden clips
+  5 clips derived from clip_1 of the 5s_ball_visible_no_names set.
+  Each clip is 5 seconds. The ball is visible for the first N seconds,
+  then shrunk to 5% (near-invisible) for the remaining (5-N) seconds.
+  Variants: 0s+5s, 1s+4s, 2s+3s, 3s+2s, 4s+1s.
+
+10s_ball_visible_no_names/      ← USE THIS for 10-second clips (30 clips)
+  30 clips, 10 seconds each. Ball VISIBLE. No player names. 32×12 grid.
+  6 different scenarios × 5 different random seeds = 30 total.
+  This is the main benchmark clip set.
+
+_probe/
+  Internal gfootball dump files used during scenario exploration.
+  Not clips — can be ignored.
+
+*.jsonl files
+  Model response logs from earlier probing runs (qwen, llava, minicpm, claude).
+  JSON Lines format, one response per line.
+
+HOW PLAYER NAMES ARE REMOVED
+-----------------------------
+The Google Research Football C++ engine always shows a name label for whichever
+player currently has the ball, even when no human controllers are connected.
+The engine loads the name font from the GFOOTBALL_FONT environment variable.
+
+Our fix: we replaced the font file with a modified copy where every character
+maps to the space glyph (which has no visible ink). We set GFOOTBALL_FONT to
+this blank font BEFORE importing gfootball, so the engine's own __init__.py
+(which would otherwise override GFOOTBALL_FONT with the original) leaves it alone.
+The blank font is in: experiments/asset_bundles/noname/data/media/fonts/alegreya/
+
+HOW THE BALL IS SHRUNK (for hidden-ball clips)
+-----------------------------------------------
+The ball is a 3D mesh defined in generic.ase. We scale all vertex coordinates
+by 5% (0.05), making the ball roughly 3-4 pixels at normal field view — visible
+but hard to track. The scaled asset lives in:
+  experiments/asset_bundles/noname_ball_invisible/data/media/objects/balls/generic.ase
+
+SCRIPTS THAT GENERATE CLIPS
+-----------------------------
+experiments/nithil_work/gen_5s_noname_clips.py       → 5s_ball_visible_no_names/
+experiments/nithil_work/gen_visibility_variants.py   → 5s_visibility_splits/
+experiments/nithil_work/gen_10s_noname_clips.py      → 10s_ball_visible_no_names/
+experiments/build_noname_bundles.py                  → builds asset bundles
+
+For full history see: spot-the-ball-2.0/RESEARCH_LOG.md

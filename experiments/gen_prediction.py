@@ -20,7 +20,7 @@ import subprocess
 from pathlib import Path
 
 import lib
-from lib import use_bundle, make_env, run_clip, latest_avi, latest_dump, REPO, CLIP_STEPS, FPS
+from lib import use_bundle, make_env, run_clip_capture, frames_to_mov, latest_dump, REPO, CLIP_STEPS, FPS
 
 OUT = REPO / "experiments/stimuli/prediction"
 
@@ -58,15 +58,15 @@ def make_item(level: str, seed: int, cutoff_s: int):
     item_dir = OUT / item_id
     item_dir.mkdir(parents=True, exist_ok=True)
     work = item_dir / "_work"
-    env = make_env(level, seed, work, write_video=True, hud=False)
-    info = run_clip(env, steps=CLIP_STEPS, dump_name=f"p_{item_id}")
+    env = make_env(level, seed, work, write_video=False, hud=False)
+    info = run_clip_capture(env, steps=CLIP_STEPS, dump_name=f"p_{item_id}")
     env.close()
 
-    avi = latest_avi(work)
     dump = latest_dump(work)
+    frames = info["frames"]
     # Full transcoded version (for debugging — not shown to subjects).
     full_mov = item_dir / "full.mov"
-    lib.avi_to_mov(avi, full_mov)
+    frames_to_mov(frames, full_mov)
     # Visible portion: first cutoff_s seconds.
     clip_mov = item_dir / "clip.mov"
     trim_clip(full_mov, clip_mov, duration_s=cutoff_s)

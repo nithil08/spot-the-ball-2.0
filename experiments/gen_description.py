@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 import lib
-from lib import use_bundle, make_env, run_clip, latest_avi, extract_frame, REPO
+from lib import use_bundle, make_env, run_clip_capture, frame_to_png, REPO
 
 OUT = REPO / "experiments/stimuli/description"
 
@@ -44,14 +44,15 @@ def make_item(level: str, seed: int, sample_frame: int):
 
     # 1. Run a short clip just long enough to reach the sample frame.
     work = item_dir / "_work"
-    env = make_env(level, seed, work, write_video=True, hud=False)
-    info = run_clip(env, steps=max(sample_frame + 5, 30), dump_name=f"d_{item_id}")
+    env = make_env(level, seed, work, write_video=False, hud=False)
+    info = run_clip_capture(env, steps=max(sample_frame + 5, 30), dump_name=f"d_{item_id}")
     env.close()
 
-    avi = latest_avi(work)
-    # 2. Extract the stimulus frame.
+    # 2. Extract the stimulus frame from the captured buffer.
+    captured = info["frames"]
+    target = min(sample_frame, len(captured) - 1)
     frame_png = item_dir / "frame.png"
-    extract_frame(avi, sample_frame, frame_png)
+    frame_to_png(captured[target], frame_png)
 
     # 3. Record ground truth.
     # Read the dump to count actually-rendered players at the chosen frame.

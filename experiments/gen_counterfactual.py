@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 
 import lib
-from lib import use_bundle, make_env, run_clip, latest_avi, REPO, CLIP_STEPS
+from lib import use_bundle, make_env, run_clip_capture, frames_to_mov, REPO, CLIP_STEPS
 import scenario_factory as sf
 from rollout import score_rate
 
@@ -35,12 +35,11 @@ def make_item(seed: int, n_seeds: int = 10):
 
     # 1. Render the base clip (the one shown to subjects).
     work = item_dir / "_work"
-    env = make_env(base.name, seed, work, write_video=True, hud=False)
-    run_clip(env, steps=CLIP_STEPS, dump_name=f"cf_{item_id}")
+    env = make_env(base.name, seed, work, write_video=False, hud=False)
+    info = run_clip_capture(env, steps=CLIP_STEPS, dump_name=f"cf_{item_id}")
     env.close()
-    avi = latest_avi(work)
     clip_mov = item_dir / "clip.mov"
-    lib.avi_to_mov(avi, clip_mov)
+    frames_to_mov(info["frames"], clip_mov)
 
     # 2. Baseline P(goal): run base scenario many times.
     base_summary = score_rate(base.name, n_seeds=n_seeds, max_steps=150)

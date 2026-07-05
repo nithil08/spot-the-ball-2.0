@@ -1,0 +1,6 @@
+# Ignore large binary video files — folder structure and READMEs are tracked
+videos/**/*.mov
+videos/**/*.mp4
+videos/**/*.avi
+videos/**/*.dump
+videos/**/*.png

@@ -21,7 +21,7 @@ import json
 from pathlib import Path
 
 import lib
-from lib import use_bundle, make_env, run_clip, latest_avi, extract_frame, REPO
+from lib import use_bundle, make_env, run_clip_capture, frame_to_png, REPO
 import scenario_factory as sf
 from rollout import score_rate
 
@@ -32,11 +32,12 @@ def render_static(level: str, seed: int, frame: int, out_png: Path):
     """Render a static frame from a scenario at the given step."""
     work = out_png.parent / f"_work_{level}_{seed}"
     work.mkdir(parents=True, exist_ok=True)
-    env = make_env(level, seed, work, write_video=True, hud=False)
-    run_clip(env, steps=max(frame + 5, 20), dump_name=f"hyp_{level}_{seed}")
+    env = make_env(level, seed, work, write_video=False, hud=False)
+    info = run_clip_capture(env, steps=max(frame + 5, 20), dump_name=f"hyp_{level}_{seed}")
     env.close()
-    avi = latest_avi(work)
-    extract_frame(avi, frame, out_png)
+    captured = info["frames"]
+    target = min(frame, len(captured) - 1)
+    frame_to_png(captured[target], out_png)
 
 
 def make_item(seed: int, frame: int = 15, n_seeds: int = 12):

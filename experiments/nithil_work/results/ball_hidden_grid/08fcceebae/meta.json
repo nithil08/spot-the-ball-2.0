@@ -1,0 +1,41 @@
+{
+  "id": "08fcceebae",
+  "level": "academy_3_vs_1_with_keeper",
+  "seed": 23,
+  "grid": {
+    "cols": 32,
+    "rows": 12,
+    "cell_px": 40,
+    "total_cells": 384,
+    "note": "32x12 squares (384 total), 40x40px, burned into every frame. Columns 1-32 left->right, rows A-L top->bottom. Spot The Ball (Balamurugan et al., arXiv:2511.00261) uses a 6x10 (60-cell) alphanumeric grid burned onto the image; this is the same convention at much finer, square resolution."
+  },
+  "freeze_step": 40,
+  "predict_step": 50,
+  "clip_visible_s": 4.0,
+  "ground_truth": {
+    "ball_xy_at_freeze": [
+      0.7780098915100098,
+      0.012865087948739529
+    ],
+    "ball_cell_at_freeze": "H28",
+    "ball_bin_at_freeze": [
+      27,
+      7
+    ],
+    "ball_xy_at_predict": [
+      0.6233552694320679,
+      -0.05722638592123985
+    ],
+    "ball_cell_at_predict": "G26",
+    "ball_bin_at_predict": [
+      25,
+      6
+    ]
+  },
+  "questions": {
+    "locate_now": "The ball has been made invisible. This clip shows 4s of play. A 32x12 grid is overlaid on the video (columns 1-32 left to right, rows A-L top to bottom). Based on player positions, body orientation, and motion, which grid cell is the ball in RIGHT NOW, at the final frame of the clip? Answer with a cell like 'F14'.",
+    "predict_next": "Now predict one second further: which grid cell will the ball be in at 1 second after this clip ends? Answer in the same format."
+  },
+  "stimulus": "clip.mov",
+  "debug_stimulus_NOT_FOR_MODEL": "debug_full.mov"
+}

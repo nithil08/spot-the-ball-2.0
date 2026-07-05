@@ -1,0 +1,31 @@
+{
+  "id": "e9d90747ad",
+  "level": "academy_counterattack_easy",
+  "seed": 23,
+  "freeze_step": 40,
+  "predict_step": 50,
+  "grid": "6 cols (0-5, left->right) x 4 rows (0-3, top->bottom)",
+  "ground_truth": {
+    "ball_xy_at_4s": [
+      0.35334503650665283,
+      -0.18964210152626038
+    ],
+    "ball_bin_at_4s": [
+      4,
+      1
+    ],
+    "ball_xy_at_5s": [
+      0.3762519657611847,
+      -0.09680885821580887
+    ],
+    "ball_bin_at_5s": [
+      4,
+      1
+    ]
+  },
+  "stimulus": "frame_4s.png",
+  "questions": {
+    "locate_now": "The ball has been made invisible in this frame, which is frozen 4 seconds into the play. Based on player positions, body orientation, and motion, where is the ball RIGHT NOW? Answer with a grid cell: col=<0-5> row=<0-3>, where col 0 is the far left of the pitch and col 5 is the far right, row 0 is the top of the frame and row 3 is the bottom.",
+    "predict_next": "Now predict one second further: where will the ball be at the 5-second mark (1 second after this frame)? Answer with the same grid format: col=<0-5> row=<0-3>."
+  }
+}
