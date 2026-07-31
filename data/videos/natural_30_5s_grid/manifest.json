@@ -1,0 +1,242 @@
+[
+  {
+    "clip": 1,
+    "file": "clip_01.mov",
+    "seed": 42,
+    "window_start": 10,
+    "final_step": 59,
+    "movement": 0.4749
+  },
+  {
+    "clip": 2,
+    "file": "clip_02.mov",
+    "seed": 42,
+    "window_start": 60,
+    "final_step": 109,
+    "movement": 0.379
+  },
+  {
+    "clip": 3,
+    "file": "clip_03.mov",
+    "seed": 42,
+    "window_start": 110,
+    "final_step": 159,
+    "movement": 0.5649
+  },
+  {
+    "clip": 4,
+    "file": "clip_04.mov",
+    "seed": 42,
+    "window_start": 160,
+    "final_step": 209,
+    "movement": 0.3478
+  },
+  {
+    "clip": 5,
+    "file": "clip_05.mov",
+    "seed": 42,
+    "window_start": 260,
+    "final_step": 309,
+    "movement": 0.3738
+  },
+  {
+    "clip": 6,
+    "file": "clip_06.mov",
+    "seed": 42,
+    "window_start": 310,
+    "final_step": 359,
+    "movement": 0.3693
+  },
+  {
+    "clip": 7,
+    "file": "clip_07.mov",
+    "seed": 7,
+    "window_start": 10,
+    "final_step": 59,
+    "movement": 0.4798
+  },
+  {
+    "clip": 8,
+    "file": "clip_08.mov",
+    "seed": 7,
+    "window_start": 60,
+    "final_step": 109,
+    "movement": 0.6085
+  },
+  {
+    "clip": 9,
+    "file": "clip_09.mov",
+    "seed": 7,
+    "window_start": 110,
+    "final_step": 159,
+    "movement": 0.4727
+  },
+  {
+    "clip": 10,
+    "file": "clip_10.mov",
+    "seed": 7,
+    "window_start": 160,
+    "final_step": 209,
+    "movement": 0.3799
+  },
+  {
+    "clip": 11,
+    "file": "clip_11.mov",
+    "seed": 7,
+    "window_start": 210,
+    "final_step": 259,
+    "movement": 0.5024
+  },
+  {
+    "clip": 12,
+    "file": "clip_12.mov",
+    "seed": 7,
+    "window_start": 260,
+    "final_step": 309,
+    "movement": 0.4693
+  },
+  {
+    "clip": 13,
+    "file": "clip_13.mov",
+    "seed": 11,
+    "window_start": 10,
+    "final_step": 59,
+    "movement": 0.5236
+  },
+  {
+    "clip": 14,
+    "file": "clip_14.mov",
+    "seed": 11,
+    "window_start": 60,
+    "final_step": 109,
+    "movement": 0.5051
+  },
+  {
+    "clip": 15,
+    "file": "clip_15.mov",
+    "seed": 11,
+    "window_start": 110,
+    "final_step": 159,
+    "movement": 0.562
+  },
+  {
+    "clip": 16,
+    "file": "clip_16.mov",
+    "seed": 11,
+    "window_start": 160,
+    "final_step": 209,
+    "movement": 0.3899
+  },
+  {
+    "clip": 17,
+    "file": "clip_17.mov",
+    "seed": 11,
+    "window_start": 210,
+    "final_step": 259,
+    "movement": 0.6045
+  },
+  {
+    "clip": 18,
+    "file": "clip_18.mov",
+    "seed": 11,
+    "window_start": 260,
+    "final_step": 309,
+    "movement": 0.5403
+  },
+  {
+    "clip": 19,
+    "file": "clip_19.mov",
+    "seed": 23,
+    "window_start": 10,
+    "final_step": 59,
+    "movement": 0.7045
+  },
+  {
+    "clip": 20,
+    "file": "clip_20.mov",
+    "seed": 23,
+    "window_start": 60,
+    "final_step": 109,
+    "movement": 0.5761
+  },
+  {
+    "clip": 21,
+    "file": "clip_21.mov",
+    "seed": 23,
+    "window_start": 110,
+    "final_step": 159,
+    "movement": 0.4691
+  },
+  {
+    "clip": 22,
+    "file": "clip_22.mov",
+    "seed": 23,
+    "window_start": 260,
+    "final_step": 309,
+    "movement": 0.6776
+  },
+  {
+    "clip": 23,
+    "file": "clip_23.mov",
+    "seed": 23,
+    "window_start": 310,
+    "final_step": 359,
+    "movement": 0.4197
+  },
+  {
+    "clip": 24,
+    "file": "clip_24.mov",
+    "seed": 23,
+    "window_start": 360,
+    "final_step": 409,
+    "movement": 0.5678
+  },
+  {
+    "clip": 25,
+    "file": "clip_25.mov",
+    "seed": 3,
+    "window_start": 10,
+    "final_step": 59,
+    "movement": 0.4254
+  },
+  {
+    "clip": 26,
+    "file": "clip_26.mov",
+    "seed": 3,
+    "window_start": 60,
+    "final_step": 109,
+    "movement": 0.4353
+  },
+  {
+    "clip": 27,
+    "file": "clip_27.mov",
+    "seed": 3,
+    "window_start": 110,
+    "final_step": 159,
+    "movement": 0.3421
+  },
+  {
+    "clip": 28,
+    "file": "clip_28.mov",
+    "seed": 3,
+    "window_start": 160,
+    "final_step": 209,
+    "movement": 0.4727
+  },
+  {
+    "clip": 29,
+    "file": "clip_29.mov",
+    "seed": 3,
+    "window_start": 210,
+    "final_step": 259,
+    "movement": 0.5645
+  },
+  {
+    "clip": 30,
+    "file": "clip_30.mov",
+    "seed": 3,
+    "window_start": 260,
+    "final_step": 309,
+    "movement": 0.5985
+  }
+]

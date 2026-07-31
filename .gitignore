@@ -55,3 +55,17 @@ Thumbs.db
 *.avi
 *.mov
 *.dump
+
+# Large generated numpy frame arrays and render assets (12G+, regenerable; keep out of git)
+*.npy
+*.npz
+*.zip
+*.bmp
+*.anim
+*.ase
+*.object
+*.vert
+
+# Rendered frame PNGs under generated result/data trees (code + small text artifacts still tracked)
+experiments/nithil_work/results/**/*.png
+data/videos/**/*.png

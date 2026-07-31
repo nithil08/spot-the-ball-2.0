@@ -413,3 +413,16 @@ The idea: give a model or human more and more context and see if their guess abo
 - Purpose: test whether more time watching ball improves model predictions
 - Output: experiments/nithil_work/results/10s_visibility_splits/clip_01/ ... clip_30/
 - Bundles: noname (visible) + noname_ball_invisible (hidden, 5% ball scale)
+
+### 2026-07-08 — Generated 2 natural 5s passing clips × 3 grid variants (gen_natural_passing_clips.py)
+
+- Brief: continuous play, NO goals — passing / moving / chasing a moving ball (not everyone dribbling); natural framing (do NOT force all 22 on frame); ball visible throughout; no names
+- Fix vs prior match_clips batch: dropped wide full_field + zoomed half_field crops (looked OD); used only the standard ball-tracking camera for natural framing
+- Match: 11_vs_11_stochastic, seed 42 (verified goal-free across 450 steps, score 0-0)
+- clip1: warmup=30 (steps 30-80), settled midfield possession/passing
+- clip2: warmup=110 (steps 110-160), ball travels laterally, some chasing
+- Grid variants per clip (labelled, burned): 32x12, 16x6, 28x8, 8x3 (yellow alphanumeric)
+- 10 clips total (clipN_base + clipN_grid_{32x12,16x6,28x8,8x3}), all 1280x480, 50 frames @ 10 fps = 5.0s
+- Note: green-jersey players are the goalkeepers (one per side)
+- Output: experiments/nithil_work/results/natural_passing_clips/
+- Bundle: noname (ball visible, no player-name captions) | HUD: cropped
