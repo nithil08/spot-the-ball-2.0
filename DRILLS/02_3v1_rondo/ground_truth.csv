@@ -1,0 +1,4 @@
+drill,variant,clip_base,seed,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py
+2,1,drill2_3v1_rondo_v1,42,C7,490.2,194.6,C10,762.6,182.8
+2,2,drill2_3v1_rondo_v2,42,C7,505.2,190.9,C10,783.4,180.9
+2,3,drill2_3v1_rondo_v3,42,C6,477.1,199.5,C8,603.7,211.5

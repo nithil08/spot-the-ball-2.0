@@ -1,0 +1,4 @@
+drill,variant,clip_base,seed,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py
+6,1,drill6_switch_of_play_v1,42,B7,526.2,127.8,C5,383.4,196.7
+6,2,drill6_switch_of_play_v2,42,B7,545.0,86.9,C7,557.3,180.1
+6,3,drill6_switch_of_play_v3,42,C7,507.7,167.1,C5,372.0,199.5

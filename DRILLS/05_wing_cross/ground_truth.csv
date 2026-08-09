@@ -1,0 +1,4 @@
+drill,variant,clip_base,seed,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py
+5,1,drill5_wing_cross_v1,42,D8,608.8,282.0,C11,827.5,196.3
+5,2,drill5_wing_cross_v2,42,C8,625.5,225.7,D14,1071.1,304.8
+5,3,drill5_wing_cross_v3,42,E8,591.9,373.0,C11,815.2,192.0

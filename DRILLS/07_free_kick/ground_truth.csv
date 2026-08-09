@@ -1,0 +1,4 @@
+drill,variant,clip_base,seed,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py
+7,1,drill7_free_kick_v1,42,C9,657.4,199.8,C9,695.3,189.8
+7,2,drill7_free_kick_v2,42,C9,670.8,194.9,C9,656.3,168.3
+7,3,drill7_free_kick_v3,42,C9,646.4,206.5,C8,597.3,199.2
