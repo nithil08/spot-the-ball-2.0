@@ -1,8 +1,8 @@
 # GEN2 — where this stopped, and how to pick it up
 
-Paused 2026-08-21 (third pause) for review. All background engine jobs were stopped
-deliberately; nothing crashed and nothing is half-written. Every stage checkpoints, so
-resuming is just re-running the commands below — completed work is skipped.
+Paused 2026-08-21 (fourth pause). All background engine jobs were stopped deliberately.
+Every stage checkpoints, so resuming is re-running the commands below — completed work is
+skipped.
 
 ## Where to look
 
@@ -16,13 +16,12 @@ Desktop is also iCloud-synced, so a stale second copy exists under
 
 | What | Where |
 |---|---|
-| The 40 finished clips | `04_player_delta/full_visibility/` and `04_player_delta/split_1s_4s/` |
-| Quick visual review (no video player needed) | `_review/player_delta_FINAL_frames.png`, `_review/player_delta_FIRST_frames.png` |
-| Ground truth | `04_player_delta/ground_truth.csv` |
+| The 60 finished clips | `01_headers/`, `02_corner_kicks/`, `03_goalkeeper_throws/`, each with `full_visibility/` and `split_1s_4s/` |
+| Visual review, no video player needed | `_review/situations_{header,corner,gk_throw}.png` — frames 0 / 25 / 49 of every clip |
+| Ground truth | `<class>/ground_truth.csv` and `SITUATIONS_GROUND_TRUTH.csv` |
 | Spec check | `python3 verify_batch.py` |
 
-Open all 20 full-visibility clips at once:
-`open 04_player_delta/full_visibility/*.mov`
+Open a class at once: `open 01_headers/full_visibility/*.mov`
 
 Clips are **not** in git — the repo has a blanket `*.mov` ignore rule that predates GEN2.
 Ground truth, review sheets and all code are tracked.
@@ -31,58 +30,98 @@ Ground truth, review sheets and all code are tracked.
 
 | Stage | State |
 |---|---|
-| Kit bundles (`gen2`, `gen2_ball_invisible`) | **done** — blue / red / yellow, verified on screen |
-| Match sweep | **602 / 720 matches cached** |
-| Situation picks | headers **20/20**, corners **20/20**, gk throws **20/20** — all reached |
-| **Player-delta clips** | **DONE — 40 clips, all spec checks pass** |
-| Situation clips | **not rendered yet** — 120 clips outstanding |
+| Kit bundles (`gen2`, `gen2_ball_invisible`) | **done** — blue / red / yellow |
+| Match sweep | 602 / 720 cached (no longer gates anything) |
+| `01_headers` | **DONE — 20 clips** (10 situations x 2 variants) |
+| `02_corner_kicks` | **DONE — 20 clips** |
+| `03_goalkeeper_throws` | **DONE — 20 clips** |
+| `04_player_delta` | **rebuilt, mid-probe** — 8 / 24 probe maps, 0 clips |
 
-All three situation classes hit 20/20 at 546 matches, so the sweep no longer gates
-anything. The remaining 118 matches would only marginally improve which 20 get picked.
+60 of the intended 100 clips exist.
+
+## Player-delta: rejected, and what replaced it
+
+All 20 of the original clips were rejected, for four reasons — the last of which kills the
+mechanism rather than needing a tweak:
+
+1. the ball sat stranded in empty grass;
+2. the frames were too empty to read as a match;
+3. windows opened on kickoff clumps, with no real action;
+4. **hiding players is the wrong approach entirely.**
+
+The count is now obtained by SELECTION, not subtraction: all 22 players render in every
+frame, and windows are searched for ones the camera naturally frames at 6 / 10 / 12 / 16.
+That also fixes (1) and (2) — the emptiness *was* the hiding. A window must additionally
+have >= 3 players near the ball at BOTH ends, real ball travel, the on-screen players
+grouped around the play, no set piece or restart inside, and must not start in the first
+150 frames (the kickoff).
+
+`gen_player_delta.py` was rewritten for this. The old hiding code, and the defects that
+came with it (source reuse, one-sided teams), are gone with it — `verify_batch.py` still
+checks source diversity, and its team-balance check now reads a set where nobody is
+hidden, so it should pass trivially.
+
+**Two cheaper ways to count players were tried and both failed. Do not retry them:**
+
+* Fitting the camera frustum geometrically, so the 600 cached sweep matches could be
+  scanned for free: 93.6% correct per player, but the per-frame COUNT was exactly right
+  only **36%** of the time (sd 1.48). Geometry cannot know one player is behind another.
+* Counting kit-coloured blobs in the rendered frame: bias **+5.8 players**, some frames
+  off by 40+. The advertising hoardings are saturated blue and red, and one player's shirt
+  and shorts split into separate blobs.
+
+The count *is* the ground truth here, so the exact solo probe is used.
+
+## THE PROBE DIES AFTER ~46 ENGINE INSTANCES — run it one match per process
+
+Seen three times; the third pinned it down. Four independent shards each completed
+**exactly 2 matches** and then died, no traceback, no error line. Each match creates 23
+environments (a plate plus 22 solo passes), so every process died at roughly its 46th
+`FootballEnv`. That is a resource leak in the engine — an env that is closed but does not
+return its GL context or file descriptors — not a bug in this code, and a short test run
+will never show it.
+
+The fix is to let the OS reclaim everything between matches. `probe_one` probes a single
+unprobed match and exits 0 if it did work, 1 when the shard is empty, so a shell `while`
+loop terminates on its own:
+
+```bash
+for i in 0 1 2 3; do
+  ( while python3 gen_player_delta.py probe_one --shard $i/4 > _cache/pdprobe_$i.log 2>&1; do :; done ) &
+done
+```
 
 ## Resume
 
-Run from `GEN2/`. Two options:
-
 ```bash
-# A. finish the sweep first (~8 min, 4 shards), then pick and render.
-#    Slightly better picks, since the top-20 is drawn from a bigger pool.
+cd GEN2
+
+# 1. finish the player-delta probe (16 of 24 matches left, ~12 min over 4 shards)
 for i in 0 1 2 3; do
-  nohup python3 sweep_events.py 60 1100 --shard $i/4 > _cache/sweep_$i.log 2>&1 &
-  sleep 4
+  ( while python3 gen_player_delta.py probe_one --shard $i/4 >> _cache/pdprobe_$i.log 2>&1; do :; done ) &
 done
-# wait for those to exit, then:
-python3 pick_situations.py
-python3 gen_situations.py all
+# wait for all four loops to exit, then confirm:
+ls _cache/player_delta/counts | wc -l          # want 24
 
-# B. or just render now off the 602 matches already cached — all three
-#    situations are already at 20/20.
-python3 pick_situations.py
-python3 gen_situations.py all
+# 2. pick windows and render the 40 clips
+python3 gen_player_delta.py pick               # want 5 each of 6/10/12/16, 20 matches
+python3 gen_player_delta.py vis
+python3 gen_player_delta.py inv
+python3 gen_player_delta.py compose
+
+# 3. check the whole batch
+python3 verify_batch.py
 ```
 
-Then check the whole batch:
+`verify_batch.py` currently expects 20 situations per class; it needs
+`WANT_PER_CLASS = 10` for the three situation classes and 20 for player-delta, or it will
+report the 10-per-class sets as short. Fix that before trusting its summary.
 
-```bash
-python3 verify_batch.py     # expects 160 clips, exits non-zero on any problem
-```
-
-## Two defects found and fixed in the player-delta set — don't reintroduce them
-
-**Source diversity.** `phase_pick` originally reserved matches per end-count, so one match
-could supply all four counts. With windows offset by only 5 frames, `end16_01` and
-`end12_01` shared 45 of their 50 frames — one passage of play shown four ways. Matches are
-now consumed globally, one clip each, and the phase warns if forced to reuse one.
-
-**Team balance.** `choose_hide_set` ranked the whole frame by dwell and cut the tail, which
-wiped out a whole side: 4 of the 5 end-6 clips came out 0 blue / 6 red. The surplus is now
-chosen per team. `verify_batch.py` checks both of these, so a regression will be caught.
+If `pick` cannot fill a count from 24 matches, add a fourth seed to `SEEDS` in
+`gen_player_delta.py` and probe again rather than relaxing the football-quality tests —
+those tests are what the rejection was about.
 
 ## Other things worth knowing
-
-**The probe process died on its own twice**, partway through, no traceback. It checkpoints
-`_cache/player_delta/onscreen.json` per match and skips keys already present, so re-running
-continues. Check the map count rather than assuming it finished.
 
 **Do not "fix" the corner window offsets.** Corner clips open at `award + 1`, not at the
 award. Opening earlier drags in the referee's re-spot of the ball onto the corner arc — a
@@ -93,6 +132,10 @@ delivery f819, bad window opened at f806).
 **Header contest count is scored, not filtered.** GEN1 required 2+ bodies under the ball;
 on GEN2's match shapes that rejects essentially every header (over 31 matches, 21 clear
 the physical tests but only 1 has more than one player under it).
+
+**Continuity is a property of the window, not the probe.** An early version rejected a
+whole 450-frame probe if a goal happened anywhere in it, which threw away perfectly good
+windows either side. It is now checked per 50-frame window.
 
 ## Not done, and not started
 
