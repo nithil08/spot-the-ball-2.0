@@ -124,8 +124,17 @@ def choose_hide_set(on, s, e, want_end):
     because they are out of shot by then anyway — but they may well be on camera earlier,
     which is what lets the count fall naturally as the camera tracks away from them.
 
-    Hiding the surplus by SHORTEST dwell keeps the group that stays on screen the stable
-    one, so the count settles rather than flickering at the frame edge.
+    BOTH TEAMS MUST SURVIVE. The surplus is chosen per team, not from one pooled ranking.
+    Ranking the whole frame by dwell and cutting the tail wiped out an entire side: 4 of
+    the 5 end-6 clips came out 0 blue / 6 red, because the left team happened to be the
+    one moving through frame and so held the short-dwell places. Six players of one colour
+    and nobody to play against does not read as football. Each team keeps roughly half the
+    quota, and only tops up from the other side when one team genuinely has too few bodies
+    on camera to fill its share.
+
+    Within a team the surplus is still dropped by SHORTEST dwell, so the group that stays
+    on screen is the stable one and the count settles rather than flickering at the frame
+    edge.
 
     An earlier version kept only end-frame players and hid everyone else. That was wrong
     for GEN2: it forced n_first <= want_end, so the on-screen count could never fall
@@ -140,8 +149,15 @@ def choose_hide_set(on, s, e, want_end):
     if len(end_in) < want_end:
         return None
     dwell = {i: sum(on[i][s:e + 1]) for i in range(n_slots)}
-    surplus = sorted(end_in, key=lambda i: dwell[i])[:len(end_in) - want_end]
-    hidden = set(surplus)
+
+    left = [i for i in end_in if ALL_SLOTS[i].startswith("L")]
+    right = [i for i in end_in if ALL_SLOTS[i].startswith("R")]
+    keep_l = min(len(left), want_end // 2)
+    keep_r = min(len(right), want_end - keep_l)
+    keep_l = min(len(left), want_end - keep_r)          # top up if one side is short
+    by_dwell = lambda g: sorted(g, key=lambda i: -dwell[i])          # noqa: E731
+    keep = set(by_dwell(left)[:keep_l]) | set(by_dwell(right)[:keep_r])
+    hidden = set(end_in) - keep
     shown = [i for i in range(n_slots) if i not in hidden]
     n_last = sum(1 for i in shown if on[i][e])
     if n_last != want_end:
