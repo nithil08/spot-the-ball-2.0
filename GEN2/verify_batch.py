@@ -5,10 +5,13 @@ disk rather than against the pipeline's own logs — a generator that silently w
 still prints a happy summary, so the count has to be taken from the filesystem.
 
 Checks:
-  * 20 situations per class, each present in BOTH visibility folders (40 files per class)
+  * the expected number of situations per class, each present in BOTH visibility folders
   * every clip is exactly 5.0 s / 50 frames at 10 fps
   * ground_truth.csv covers every clip on disk, and every row has a clip on disk
   * player-delta end counts are 5 each of 6 / 10 / 12 / 16, and match the CSV
+  * player-delta hides NOBODY — all 22 players in play, players_hidden == 0. The original
+    clips hit their count by hiding players and were rejected for it, so this guards
+    against the approach creeping back in.
   * player-delta clips are not one-sided (both teams on screen at the end)
   * player-delta source matches are distinct — 20 clips from 20 different matches
 
@@ -24,9 +27,18 @@ from pathlib import Path
 
 from gen2_lib import ALL_SLOTS, CACHE, CLIP_FRAMES, FPS, HERE
 
-CLASSES = ["01_headers", "02_corner_kicks", "03_goalkeeper_throws", "04_player_delta"]
+# Situations per class. The three match-situation classes are 10 each (the batch was cut
+# from 20 to 10 on request); player-delta stays at 20, because it has to cover four
+# separate end-counts at 5 apiece. Each situation ships in BOTH visibility variants, so
+# the clip count per class is twice the number here.
+WANT_PER_CLASS = {
+    "01_headers": 10,
+    "02_corner_kicks": 10,
+    "03_goalkeeper_throws": 10,
+    "04_player_delta": 20,
+}
+CLASSES = list(WANT_PER_CLASS)
 VARIANTS = ["full_visibility", "split_1s_4s"]
-WANT_PER_CLASS = 20
 END_COUNTS = {6: 5, 10: 5, 12: 5, 16: 5}
 
 fails, warns = [], []
@@ -64,10 +76,11 @@ def check_counts_and_pairing():
         names = {}
         for v in VARIANTS:
             names[v] = {p.stem for p in (d / v).glob("*.mov")} if (d / v).is_dir() else set()
+        want = WANT_PER_CLASS[cls]
         n_full, n_split = len(names["full_visibility"]), len(names["split_1s_4s"])
-        if n_full != WANT_PER_CLASS or n_split != WANT_PER_CLASS:
+        if n_full != want or n_split != want:
             fail(f"{cls}: {n_full} full_visibility + {n_split} split_1s_4s "
-                 f"(want {WANT_PER_CLASS} each)")
+                 f"(want {want} each)")
         else:
             ok(f"{cls}: {n_full} + {n_split} = {n_full + n_split} clips")
         only_full = names["full_visibility"] - names["split_1s_4s"]
@@ -145,32 +158,46 @@ def check_player_delta():
     else:
         ok("every clip ends with exactly its target number of players")
 
-    picks_path = CACHE / "player_delta" / "picks.json"
-    maps_path = CACHE / "player_delta" / "onscreen.json"
-    if not (picks_path.exists() and maps_path.exists()):
+    # Nobody may be hidden. This is the whole point of the rebuild: the original clips
+    # hit their count by hiding players and were rejected for it, so a non-zero here means
+    # the hiding approach has crept back in.
+    hidden = [r["clip"] for r in rows if int(r.get("players_hidden", 0)) != 0]
+    if hidden:
+        fail(f"players were hidden in {hidden} — the count must come from framing")
+    elif all(int(r["players_in_play"]) == 22 for r in rows):
+        ok("all 22 players in play and none hidden, in every clip")
+    else:
+        fail("players_in_play is not 22 in every clip")
+
+    picks_path = CACHE / "player_delta" / "picks_natural.json"
+    counts_dir = CACHE / "player_delta" / "counts"
+    if not (picks_path.exists() and counts_dir.is_dir()):
         warns.append("player-delta cache missing; skipped balance/diversity checks")
         print("  warn  cache missing, skipped balance and diversity checks")
         return
 
     picks = json.loads(picks_path.read_text())
-    maps = json.loads(maps_path.read_text())
-    sources = Counter(p["key"] for p in picks)
+    sources = Counter(p["match"] for p in picks)
     if len(sources) != len(picks):
         dupes = {k: n for k, n in sources.items() if n > 1}
         fail(f"source matches reused (clips are near-duplicates): {dupes}")
     else:
         ok(f"{len(picks)} clips from {len(sources)} distinct matches")
 
+    # Team balance is not enforced by the picker any more — nobody is hidden, so the
+    # frame contains whoever the camera saw. It is still worth reporting: a clip with one
+    # team alone would not read as football, and would mean the window choice is bad.
+    import numpy as np
     one_sided = []
     for p in picks:
-        on = maps[p["key"]]["on"]
-        e = p["end"] - 1
-        hidden = set(p["hide"].split(",")) if p["hide"] else set()
-        shown = [i for i, s in enumerate(ALL_SLOTS) if s not in hidden]
-        left = sum(1 for i in shown if on[i][e] and ALL_SLOTS[i].startswith("L"))
-        right = sum(1 for i in shown if on[i][e] and ALL_SLOTS[i].startswith("R"))
+        f = counts_dir / f"{p['match']}.npz"
+        if not f.exists():
+            continue
+        on = np.load(f)["on"][:, p["end"] - 1]
+        left = int(sum(1 for i, s in enumerate(ALL_SLOTS) if on[i] and s.startswith("L")))
+        right = int(sum(1 for i, s in enumerate(ALL_SLOTS) if on[i] and s.startswith("R")))
         if min(left, right) == 0:
-            one_sided.append(f"{p['key']}@end{p['end_count']} ({left}L/{right}R)")
+            one_sided.append(f"{p['match']}@end{p['end_count']} ({left}L/{right}R)")
     if one_sided:
         fail(f"one team missing at the final frame: {one_sided}")
     else:
@@ -184,8 +211,9 @@ def main():
     check_ground_truth()
     check_player_delta()
     total = sum(len(list((HERE / c / v).glob('*.mov'))) for c in CLASSES for v in VARIANTS)
+    want_total = sum(WANT_PER_CLASS.values()) * 2
     print(f"\n{'=' * 60}")
-    print(f"{total} clips on disk (want {WANT_PER_CLASS * len(CLASSES) * 2})")
+    print(f"{total} clips on disk (want {want_total})")
     for w in warns:
         print(f"WARN: {w}")
     if fails:

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nithil.gen2finish</string>
+
+    <!-- Finishes the GEN2 player-delta batch. One-shot: the job unloads itself at the
+         end of run_tonight.sh, so it will not fire again on later days. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2/run_tonight.sh</string>
+    </array>
+
+    <!-- 18:37 local. A few minutes past the half hour on purpose: the request was
+         "after 6:30 PM", and off-the-hour avoids colliding with anything else that
+         fires on the :30 mark. StartCalendarInterval means launchd runs the job when
+         the machine next wakes if it happened to be asleep at that moment. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>18</integer>
+        <key>Minute</key>
+        <integer>37</integer>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2/_cache/launchd_out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2/_cache/launchd_err.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- The render is CPU-heavy; keep it out of the way of anything interactive. -->
+    <key>Nice</key>
+    <integer>5</integer>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

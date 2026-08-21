@@ -45,8 +45,9 @@ HOW THE COUNT IS MEASURED
   to count, and are thrown away.
 
 WHAT ELSE A WINDOW MUST SATISFY  (this is what fixes 1-3)
-  * at least MIN_NEAR players within NEAR_RADIUS of the ball on BOTH the first and last
-    frame, so the ball is never alone
+  * enough players within NEAR_RADIUS of the ball on BOTH the first and last frame that
+    it is never sitting alone — see min_near_for(), which scales the bar with how many
+    players are on screen at all
   * the ball actually travels rather than sitting at someone's feet
   * the on-screen players are gathered around the play, not strung out to the edges
   * no set piece, goal or restart inside the window
@@ -101,38 +102,65 @@ DOWN = 2               # probe renders at half size; a body is still tens of pix
 MIN_PIX = 40           # changed (half-size) pixels before a player counts as in frame
 
 NEAR_RADIUS = 0.13     # "near the ball" in pitch units (~13% of the 105 m length)
-MIN_NEAR = 3           # bodies near the ball on the first and last frame
 MIN_TRAVEL = 0.10      # the ball must cover at least this much ground across the window
-STRIDE = 5
+STRIDE = 2             # dense window scan; the data is cached, so this is nearly free
 
 SETPIECE_MODES = (1, 2, 3, 4, 5, 6)      # anything that is not GM_NORMAL
 
-# Base matches, spread across the pitch so the camera sees different densities: play near
-# a touchline or a goal frames fewer bodies, midfield play frames more, which is what
-# makes both the low (6) and the high (16) targets reachable.
+# Base matches. The camera frames a different NUMBER of players depending on where play
+# is: in midfield it sees most of both banks of players, while out on a touchline or in a
+# corner of the pitch much of the frame is stand and dead ground, so it sees few. Both
+# extremes are needed — 16 comes from midfield, 6 only from wide, deep play.
+#
+# The first three bases are midfield and were probed first; on those eight matches
+# end_count=16 filled immediately (28 candidate windows) while end_count=6 had ZERO and
+# end_count=10 only four. Hence the wide/goal-line shapes below, borrowed from the
+# flank/box shapes in gen2_lib.SHAPES that the situation sweep showed frame far fewer
+# bodies. offsides is off for those: an offside award is a set piece, and every window
+# containing one is rejected, so leaving it on just burns candidate windows.
+# Wide bases get MORE seeds than midfield ones. Measured on the probed maps: a midfield
+# match (g2_pd01_s11) produced NOT ONE window with 10 or fewer players on screen across
+# its whole 450 frames, while a wide match (g2_pd10_s11) produced end-counts of 4, 6, 8, 9
+# and 10. High counts are abundant and low counts are scarce, so the probe budget goes
+# where the scarcity is.
+MID_SEEDS = [11, 23, 37]
+WIDE_SEEDS = [11, 23, 37, 53, 71]
+
 BASES = [
-    ("g2_pd01", (0.00, 0.00), (0.00, 0.00), (0.80, 0.80)),
-    ("g2_pd02", (0.20, 0.12), (0.25, 0.15), (0.80, 0.80)),
-    ("g2_pd03", (-0.15, -0.10), (0.15, 0.30), (0.90, 0.70)),
-    ("g2_pd04", (0.35, -0.20), (0.40, 0.20), (0.80, 0.90)),
-    ("g2_pd05", (-0.05, 0.25), (0.30, 0.35), (0.70, 0.90)),
-    ("g2_pd06", (0.45, 0.05), (0.50, 0.25), (0.90, 0.80)),
-    ("g2_pd07", (0.10, -0.28), (0.20, 0.10), (0.85, 0.85)),
-    ("g2_pd08", (0.60, 0.18), (0.55, 0.30), (0.95, 0.60)),
+    # name,      ball,            push(l, r),     difficulty,    offsides, wide?
+    ("g2_pd01", (0.00, 0.00), (0.00, 0.00), (0.80, 0.80), True, False),    # midfield
+    ("g2_pd02", (0.20, 0.12), (0.25, 0.15), (0.80, 0.80), True, False),
+    ("g2_pd03", (-0.15, -0.10), (0.15, 0.30), (0.90, 0.70), True, False),
+    ("g2_pd09", (0.75, 0.34), (0.65, 0.40), (1.00, 0.30), False, True),    # wide, final third
+    ("g2_pd10", (0.85, -0.32), (0.70, 0.45), (1.00, 0.20), False, True),
+    ("g2_pd11", (0.90, 0.10), (0.75, 0.45), (1.00, 0.10), False, True),    # camped on the box
+    ("g2_pd12", (-0.90, -0.10), (0.45, 0.75), (0.10, 1.00), False, True),
+    ("g2_pd13", (-0.75, -0.34), (0.40, 0.65), (0.30, 1.00), False, True),
+    ("g2_pd14", (0.62, 0.38), (0.55, 0.35), (0.90, 0.40), False, True),    # on the touchline
 ]
-SEEDS = [11, 23, 37]                      # 8 bases x 3 seeds = 24 matches
 
 
 def bases():
-    for name, ball, (pl, pr), diff in BASES:
-        yield name, match_spec(name, ball=ball, offsides=True, difficulty=diff,
+    for name, ball, (pl, pr), diff, offs, _wide in BASES:
+        yield name, match_spec(name, ball=ball, offsides=offs, difficulty=diff,
                                push_left=pl, push_right=pr)
 
 
 def jobs():
-    for name, _spec in bases():
-        for seed in SEEDS:
+    for name, _ball, _push, _diff, _offs, wide in BASES:
+        for seed in (WIDE_SEEDS if wide else MID_SEEDS):
             yield name, seed
+
+
+def min_near_for(want):
+    """How many bodies must be around the ball, given how many are on screen at all.
+
+    Scaled deliberately. With only 6 players in frame, insisting on 3 of them around the
+    ball is a bar that open play rarely clears; two — one on the ball and one closing it
+    down — is a genuine duel and reads as football. At 10 or more on screen there is no
+    excuse for a loose ball, so the bar goes back up to 3.
+    """
+    return 2 if want <= 6 else 3
 
 
 def parse_shard(argv):
@@ -238,12 +266,23 @@ def score_window(d, on, s, e, want):
     ball = d["ball"][s:e + 1]
     if not continuous(ball):
         return None
-    if any(m in SETPIECE_MODES for m in d["game_mode"][s:e + 1]):
+    # Reject a set piece AWARDED inside the window — that is a restart mid-clip, which
+    # re-spots the ball and splits the clip into two unrelated passages. A window that
+    # merely OPENS while a restart is already pending is fine: it shows play resuming and
+    # running on, which is ordinary football. This is the same rule the corner clips use.
+    #
+    # The stricter "no non-normal mode anywhere" version had to go: low on-screen counts
+    # are structurally correlated with stoppages (when the ball goes out near a touchline
+    # the camera sits at the pitch edge, so few players are framed AND play has stopped),
+    # and it rejected every single end-count-6 window that existed.
+    gm = d["game_mode"][s:e + 1]
+    if any(gm[i] in SETPIECE_MODES and gm[i] != gm[i - 1] for i in range(1, len(gm))):
         return None
 
+    need = min_near_for(want)
     near_first = near_ball(ball[0][:2], d["left"][s], d["right"][s])
     near_last = near_ball(ball[-1][:2], d["left"][e], d["right"][e])
-    if near_first < MIN_NEAR or near_last < MIN_NEAR:
+    if near_first < need or near_last < need:
         return None
 
     travel = float(np.linalg.norm(ball[-1][:2] - ball[0][:2]))
@@ -299,6 +338,15 @@ def phase_pick():
     PICKS.write_text(json.dumps(picks, indent=2, default=float))
     print(f"phase pick: {len(picks)} windows from {len({p['match'] for p in picks})} "
           f"distinct matches ({n_usable} usable) -> {PICKS}")
+    short = {w: sum(1 for p in picks if p["end_count"] == w) for w in END_COUNTS}
+    missing = {w: PER_COUNT - n for w, n in short.items() if n < PER_COUNT}
+    if missing:
+        # Loud, because this runs unattended: a short count means the batch is incomplete
+        # and someone has to widen the probe, not that the run failed.
+        print(f"\n  *** SHORT: {missing} — need more probed matches for these counts.")
+        print("  *** Low counts come only from wide/goal-line play; add seeds to "
+              "WIDE_SEEDS and re-run the probe. Do NOT relax the near-ball or set-piece "
+              "tests: those are what the original clips were rejected for.")
 
 
 # ── PHASE vis / inv: render with NOBODY hidden ─────────────────────────────────
