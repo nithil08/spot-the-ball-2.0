@@ -1,94 +1,98 @@
 # GEN2 — where this stopped, and how to pick it up
 
-Paused 2026-08-21 (second pause). All background engine jobs were stopped deliberately;
-nothing crashed and nothing is half-written. Every stage checkpoints, so resuming is just
-re-running the commands below — completed work is skipped.
+Paused 2026-08-21 (third pause) for review. All background engine jobs were stopped
+deliberately; nothing crashed and nothing is half-written. Every stage checkpoints, so
+resuming is just re-running the commands below — completed work is skipped.
 
-## Where the files are
+## Where to look
 
-`~/Desktop/Nithil Research/spot-the-ball-2.0/GEN2/`
+```
+~/Desktop/Nithil Research/spot-the-ball-2.0/GEN2/
+```
 
 **Not** under `code/`. The repo moved out of `code/` to the workspace root on 2026-08-21.
 Desktop is also iCloud-synced, so a stale second copy exists under
 `~/Library/Mobile Documents/com~apple~CloudDocs/Desktop/` — don't work in that one.
+
+| What | Where |
+|---|---|
+| The 40 finished clips | `04_player_delta/full_visibility/` and `04_player_delta/split_1s_4s/` |
+| Quick visual review (no video player needed) | `_review/player_delta_FINAL_frames.png`, `_review/player_delta_FIRST_frames.png` |
+| Ground truth | `04_player_delta/ground_truth.csv` |
+| Spec check | `python3 verify_batch.py` |
+
+Open all 20 full-visibility clips at once:
+`open 04_player_delta/full_visibility/*.mov`
+
+Clips are **not** in git — the repo has a blanket `*.mov` ignore rule that predates GEN2.
+Ground truth, review sheets and all code are tracked.
 
 ## State at the pause
 
 | Stage | State |
 |---|---|
 | Kit bundles (`gen2`, `gen2_ball_invisible`) | **done** — blue / red / yellow, verified on screen |
-| Path fixes after the repo move | **done** |
-| Match sweep | **260 / 720 matches cached** |
-| Situation picks (from 260 matches) | headers **20/20**, gk throws **20/20**, corners **14/20** |
-| Player-delta probe | 20 matches probed, 17 usable |
-| Player-delta clips rendered | **40 clips on disk — but they need re-rendering, see below** |
-| Situation clips rendered | **none yet** |
+| Match sweep | **602 / 720 matches cached** |
+| Situation picks | headers **20/20**, corners **20/20**, gk throws **20/20** — all reached |
+| **Player-delta clips** | **DONE — 40 clips, all spec checks pass** |
+| Situation clips | **not rendered yet** — 120 clips outstanding |
 
-Only corners are still short. They run at ~0.054 per match, so the remaining 460 matches
-should yield ~25 more — comfortably past 20.
+All three situation classes hit 20/20 at 546 matches, so the sweep no longer gates
+anything. The remaining 118 matches would only marginally improve which 20 get picked.
 
-## The one thing that must be redone
+## Resume
 
-The 40 clips in `04_player_delta/` have **correct end counts but bad diversity**: all 20
-windows came from just 5 matches, and the four counts from one match were offset by only
-5 frames — `end16_01` and `end12_01` share 45 of their 50 frames. That is one passage of
-play shown four ways, not four clips.
-
-`phase_pick` has been **fixed** to consume matches globally (one clip per match), so 20
-clips will be 20 different matches. The fix is committed but has **not been re-run**. It
-needs ≥20 usable probe maps and there are currently 17, so finish the probe first.
-
-## Resume, in order
-
-Run from `GEN2/`. The sweep is the long pole; shard it across cores.
+Run from `GEN2/`. Two options:
 
 ```bash
-# 1. finish the sweep (resumable; skips the 260 already cached)
+# A. finish the sweep first (~8 min, 4 shards), then pick and render.
+#    Slightly better picks, since the top-20 is drawn from a bigger pool.
 for i in 0 1 2 3; do
   nohup python3 sweep_events.py 60 1100 --shard $i/4 > _cache/sweep_$i.log 2>&1 &
   sleep 4
 done
-
-# 2. finish the player-delta probe (resumable; skips the 20 already mapped)
-nohup python3 gen_player_delta.py probe >> _cache/probe.log 2>&1 &
-
-# 3. once the probe is done — re-pick, and CHECK the printed match count is 20/20.
-#    If it warns that a match is reused, add a 4th seed to SEEDS in gen_player_delta.py
-#    and re-probe rather than accepting duplicates.
-python3 gen_player_delta.py pick
-rm -rf 04_player_delta                     # discard the low-diversity clips
-python3 gen_player_delta.py vis
-python3 gen_player_delta.py inv
-python3 gen_player_delta.py compose
-
-# 4. once the sweep is done — re-pick; expect 20/20 for all three situations
+# wait for those to exit, then:
 python3 pick_situations.py
+python3 gen_situations.py all
 
-# 5. render the 120 situation clips (vis -> inv -> compose)
+# B. or just render now off the 602 matches already cached — all three
+#    situations are already at 20/20.
+python3 pick_situations.py
 python3 gen_situations.py all
 ```
 
-If corners still fall short of 20 after the full sweep, extend the sweep rather than
-loosening the filters — the filters are what make a clip a genuine Law 17 corner or a
-genuine by-hand throw. `python3 sweep_events.py 100 1100 --shard i/4` adds 40 more seeds
-per shape and reuses everything already cached.
+Then check the whole batch:
 
-## Things worth knowing before touching this again
+```bash
+python3 verify_batch.py     # expects 160 clips, exits non-zero on any problem
+```
 
-**The probe process has died on its own twice**, partway through, with no traceback. It
-checkpoints `_cache/player_delta/onscreen.json` after every match and skips keys already
-present, so re-running just continues. Check the map count rather than assuming it
-finished.
+## Two defects found and fixed in the player-delta set — don't reintroduce them
+
+**Source diversity.** `phase_pick` originally reserved matches per end-count, so one match
+could supply all four counts. With windows offset by only 5 frames, `end16_01` and
+`end12_01` shared 45 of their 50 frames — one passage of play shown four ways. Matches are
+now consumed globally, one clip each, and the phase warns if forced to reuse one.
+
+**Team balance.** `choose_hide_set` ranked the whole frame by dwell and cut the tail, which
+wiped out a whole side: 4 of the 5 end-6 clips came out 0 blue / 6 red. The surplus is now
+chosen per team. `verify_batch.py` checks both of these, so a regression will be caught.
+
+## Other things worth knowing
+
+**The probe process died on its own twice**, partway through, no traceback. It checkpoints
+`_cache/player_delta/onscreen.json` per match and skips keys already present, so re-running
+continues. Check the map count rather than assuming it finished.
 
 **Do not "fix" the corner window offsets.** Corner clips open at `award + 1`, not at the
-award. Opening earlier drags in the referee's re-spot of the ball onto the corner arc,
-which is a teleport small enough to slip under the continuity threshold and leaves the red
-start-circle marking a spot the ball instantly leaves. Seen and fixed on `flankR_s001`
-(award f816, delivery f819, bad window opened at f806).
+award. Opening earlier drags in the referee's re-spot of the ball onto the corner arc — a
+teleport small enough to slip under the continuity threshold, leaving the red start-circle
+marking a spot the ball instantly leaves. Seen and fixed on `flankR_s001` (award f816,
+delivery f819, bad window opened at f806).
 
 **Header contest count is scored, not filtered.** GEN1 required 2+ bodies under the ball;
 on GEN2's match shapes that rejects essentially every header (over 31 matches, 21 clear
-the physical tests but only 1 is contested by more than one player).
+the physical tests but only 1 has more than one player under it).
 
 ## Not done, and not started
 
