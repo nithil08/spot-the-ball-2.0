@@ -34,7 +34,10 @@ from gen2_lib import (BUNDLE_INV, BUNDLE_VIS, CACHE, CLIP_FRAMES, HERE, SHAPES,
 PICKS = CACHE / "picks.json"
 FR = CACHE / "situations"
 PLAN = FR / "plan.json"
-N_PER_KIND = 20
+# 10 situations per class (-> 20 clips per class, 60 in total). The picker still ranks the
+# full candidate pool and keeps 20, so this takes the BEST 10 of those rather than the
+# first 10 found.
+N_PER_KIND = 10
 
 # kind key in picks.json -> output folder, clip-name stem
 KINDS = {

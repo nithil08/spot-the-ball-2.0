@@ -1,0 +1,11 @@
+clip,situation,shape,seed,match,start_frame,end_frame,n_frames,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,detail
+corner_kick_01,corner,midpush,48,midpush_s048,100,150,50,5.0,F11,809.9,426.7,C9,669.0,164.6,{"anchor": 104; "award": 98; "min_start": 99; "apex": 4.59; "contested_by": 8; "score": 84.59337520599365}
+corner_kick_02,corner,flankR,30,flankR_s030,630,680,50,5.0,A8,562.5,63.1,C8,611.9,180.7,{"anchor": 632; "award": 629; "min_start": 630; "apex": 3.46; "contested_by": 7; "score": 73.45850467681885}
+corner_kick_03,corner,pressL2,18,pressL2_s018,638,688,50,5.0,F11,809.0,427.6,B13,964.3,137.5,{"anchor": 642; "award": 637; "min_start": 638; "apex": 5.4; "contested_by": 6; "score": 65.4005937576294}
+corner_kick_04,corner,pressL2,26,pressL2_s026,782,832,50,5.0,F11,808.4,427.5,C10,773.3,235.0,{"anchor": 786; "award": 781; "min_start": 782; "apex": 5.4; "contested_by": 6; "score": 65.39675426483154}
+corner_kick_05,corner,balanced,20,balanced_s020,218,268,50,5.0,A10,751.3,63.3,C10,723.7,177.0,{"anchor": 222; "award": 217; "min_start": 218; "apex": 5.39; "contested_by": 6; "score": 65.39100217819214}
+corner_kick_06,corner,pressL,21,pressL_s021,670,720,50,5.0,A10,750.7,63.1,C10,788.0,211.8,{"anchor": 672; "award": 669; "min_start": 670; "apex": 4.63; "contested_by": 6; "score": 64.63445091247559}
+corner_kick_07,corner,flankR,1,flankR_s001,817,867,50,5.0,F7,522.3,427.4,C7,531.9,212.7,{"anchor": 821; "award": 816; "min_start": 817; "apex": 4.59; "contested_by": 6; "score": 64.58623695373535}
+corner_kick_08,corner,flankL,38,flankL_s038,971,1021,50,5.0,A10,750.8,62.9,C10,736.6,228.5,{"anchor": 974; "award": 970; "min_start": 971; "apex": 4.46; "contested_by": 6; "score": 64.45821332931519}
+corner_kick_09,corner,boxR,20,boxR_s020,445,495,50,5.0,A8,562.7,64.0,C8,612.0,177.7,{"anchor": 447; "award": 444; "min_start": 445; "apex": 3.95; "contested_by": 6; "score": 63.94984173774719}
+corner_kick_10,corner,pressR,36,pressR_s036,790,840,50,5.0,A8,562.4,63.1,B5,332.6,149.9,{"anchor": 794; "award": 789; "min_start": 790; "apex": 3.28; "contested_by": 6; "score": 63.27998161315918}

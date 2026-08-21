@@ -1,232 +1,187 @@
-"""gen_player_delta.py — GEN2 clips controlled by how many players are IN FRAME AT THE END.
+"""gen_player_delta.py — clips that END with an exact number of players in frame,
+with NOBODY hidden.
 
-WHAT CHANGED FROM THE GEN1 "8 -> 6" CLIPS
-  The old MATCH_SITUATIONS/05_frame_visibility_8to6 set pinned BOTH ends: exactly 8
-  players in frame on the first frame and exactly 6 on the last. Per the GEN2 brief the
-  start count is not interesting — "it doesn't really matter how many players we start
-  with in the 11 v 11 game, all I need to control is how many players we end with". So
-  only the FINAL frame's count is constrained here; the opening count is whatever the
-  play happens to give, which also makes the clips look less staged.
+THE REWRITE, AND WHY
+  The first version hit the target count by hiding players (renderScale, the trick used on
+  referees). Every one of those 20 clips was rejected. Four things were wrong with them,
+  and the fourth kills the whole mechanism:
 
-  Targets: 5 clips each ending with 6, 10, 12 and 16 players in frame.
+    1. The ball was stranded in empty grass. Hiding chose victims by shortest dwell in
+       frame, and the players moving fastest through frame are precisely the ones chasing
+       the ball — so it systematically deleted the players involved in the play and kept
+       distant bystanders.
+    2. The frames were too empty to read as a match.
+    3. Windows opened on kickoff clumps (the probe only ever covered frames 0-119, which
+       is the restart), so players were bunched on the centre spot and nothing was
+       contested.
+    4. Hiding players is the wrong approach, full stop.
 
-ALL 22 PLAYERS ARE ALWAYS IN THE MATCH
-  The count on screen is a property of the CAMERA, not the squad. Every clip is a single
-  continuous render with a SINGLE fixed hide set — no splice, no mid-clip pop-in. Players
-  that are hidden are hidden for all 50 frames; the ones you see leave or enter frame
-  because they ran and the camera tracked the ball, which is what a real broadcast looks
-  like. Hiding is render-only (renderScale, the same engine trick that shrinks referees),
-  so all 23 passes over a match replay the identical play.
+  So the count is now obtained by SELECTION, not subtraction. All 22 players are rendered
+  in every frame of every clip. We search a large pool of real match windows for ones the
+  camera happens to frame with exactly the target number of bodies on the final frame.
+  Nothing is removed, so nothing can look removed.
 
-HOW "IN FRAME" IS MEASURED, NOT GUESSED
-  For each base match we render a `plate` with all 22 players hidden, then `solo_i` with
-  only player i shown, and diff them frame by frame. A non-trivial pixel difference means
-  player i's body is inside the camera frustum on that frame. That gives an exact
-  per-frame, per-player on-screen map, from which a fixed hide set is solved so that the
-  shown players number exactly N on the final frame.
+HOW THE COUNT IS KNOWN WITHOUT RENDERING
+  Counting by rendering costs 23 passes per match and only ever covered 120 frames of 25
+  matches — far too small a pool to also demand good football. calibrate_inframe.py fits
+  the camera's field of view once against those rendered labels, and the fitted model then
+  gives the on-screen count for any frame of any of the 600+ cached matches for free.
+  Ground truth for the published count is still the model, but the clips are chosen from
+  a pool large enough that we can insist on much more than the count.
 
-  Players never on camera during the window are left SHOWN — they need no hiding, they are
-  simply out of shot, and hiding them would be wasted work.
+WHAT ELSE A WINDOW MUST SATISFY  (this is what fixes 1-3)
+  * the ball is genuinely in play near people — at least MIN_NEAR players within
+    NEAR_RADIUS of it on both the first and last frame, so it is never sitting alone
+  * the ball actually travels, and is not parked
+  * the visible players are near the ball rather than scattered to the edges
+  * no set piece, no goal, no restart inside the window
+  * nothing from the opening SKIP_START frames, which is the kickoff
 
 Run:  python3 gen_player_delta.py all
-      (phases: probe -> pick -> vis -> inv -> compose; the bundle must be chosen before
-       gfootball is imported, so each engine phase is its own process)
+      (phases: pick -> vis -> inv -> compose; no probe phase any more)
 Out:  GEN2/04_player_delta/{full_visibility,split_1s_4s}/
 """
 import json
 import subprocess
 import sys
-from pathlib import Path
+from collections import Counter
 
 import numpy as np
 
-from gen2_lib import (ALL_SLOTS, BUNDLE_INV, BUNDLE_VIS, CACHE, CLIP_FRAMES, HERE,
-                      compose_pair, continuous, match_spec, render_window, write_clip)
+from gen2_lib import (CACHE, CLIP_FRAMES, BUNDLE_INV, BUNDLE_VIS, HERE, SHAPES, SWEEP,
+                      compose_pair, continuous, render_window, shape_spec, write_clip)
+from calibrate_inframe import MODEL, in_frame_mask
 
 OUT = HERE / "04_player_delta"
 PD = CACHE / "player_delta"
-MAP = PD / "onscreen.json"
-PICKS = PD / "picks.json"
+PICKS = PD / "picks_natural.json"
 
 END_COUNTS = [6, 10, 12, 16]
 PER_COUNT = 5
-PROBE_STEPS = 120          # how far into each match the on-screen map is measured
-DOWN = 2                   # probe renders at half size; a body is still tens of pixels
-MIN_PIX = 40               # changed (half-size) pixels before a player counts as in frame
 
-# Base matches. Spread across the pitch so the camera sees different densities: play near
-# a touchline or a goal naturally frames fewer bodies, midfield play frames more, which is
-# what makes both the low (6) and high (16) end-counts reachable.
-BASES = [
-    ("pd01", (0.00, 0.00), (0.00, 0.00), (0.80, 0.80)),
-    ("pd02", (0.20, 0.12), (0.25, 0.15), (0.80, 0.80)),
-    ("pd03", (-0.15, -0.10), (0.15, 0.30), (0.90, 0.70)),
-    ("pd04", (0.35, -0.20), (0.40, 0.20), (0.80, 0.90)),
-    ("pd05", (-0.05, 0.25), (0.30, 0.35), (0.70, 0.90)),
-    ("pd06", (0.45, 0.05), (0.50, 0.25), (0.90, 0.80)),
-    ("pd07", (0.10, -0.28), (0.20, 0.10), (0.85, 0.85)),
-    ("pd08", (0.60, 0.18), (0.55, 0.30), (0.95, 0.60)),
-    ("pd09", (-0.40, 0.05), (0.20, 0.45), (0.75, 0.85)),
-    ("pd10", (0.05, 0.32), (0.35, 0.25), (0.85, 0.75)),
-]
-SEEDS = [11, 23, 37]       # each base x seed is a different match (30 probes ≈ 50 min)
+SKIP_START = 150       # frames of kickoff / settling to ignore at the start of a match
+NEAR_RADIUS = 0.13     # "near the ball" in pitch units (~13% of the 105 m length)
+MIN_NEAR = 3           # bodies that must be near the ball on the first and last frame
+MIN_TRAVEL = 0.12      # the ball must cover at least this much ground across the window
+STRIDE = 7             # window start stride when scanning a match
+
+SETPIECE_MODES = (1, 2, 3, 4, 5, 6)   # anything that is not GM_NORMAL
 
 
-def bases():
-    for name, ball, (pl, pr), diff in BASES:
-        yield name, match_spec(f"g2_{name}", ball=ball, offsides=True, difficulty=diff,
-                               push_left=pl, push_right=pr)
+def load(path):
+    d = np.load(path)
+    return {k: d[k] for k in d.files}
 
 
-# ── PHASE probe ────────────────────────────────────────────────────────────────
-def phase_probe():
-    from lib import use_bundle
-    from scenario_factory import write_scenario
-    use_bundle(BUNDLE_VIS)
-    PD.mkdir(parents=True, exist_ok=True)
-    maps = json.loads(MAP.read_text()) if MAP.exists() else {}
-
-    for name, spec in bases():
-        level = write_scenario(spec, force=True)
-        for seed in SEEDS:
-            key = f"{level}_s{seed}"
-            if key in maps:
-                continue
-            plate, balls = render_window(level, seed, 0, PROBE_STEPS,
-                                         hide_slots=",".join(ALL_SLOTS))
-            if not continuous(balls):
-                print(f"  skip {key}: play breaks (goal / restart)", flush=True)
-                maps[key] = None
-                continue
-            plate = np.array(plate, dtype=np.int16)[:, ::DOWN, ::DOWN]
-            on = np.zeros((len(ALL_SLOTS), len(plate)), dtype=bool)
-            for si, slot in enumerate(ALL_SLOTS):
-                hide = ",".join(s for s in ALL_SLOTS if s != slot)   # show ONLY this one
-                solo, _ = render_window(level, seed, 0, PROBE_STEPS, hide_slots=hide)
-                solo = np.array(solo, dtype=np.int16)[:, ::DOWN, ::DOWN]
-                d = np.abs(solo - plate).sum(axis=3)
-                on[si] = (d > 30).reshape(len(plate), -1).sum(axis=1) > MIN_PIX
-            maps[key] = {"level": level, "seed": seed, "on": on.tolist()}
-            tot = on.sum(axis=0)
-            print(f"  [probe] {key}: in-frame min={int(tot.min())} max={int(tot.max())}",
-                  flush=True)
-            MAP.write_text(json.dumps(maps))       # checkpoint every match
-    print(f"phase probe: {sum(1 for v in maps.values() if v)} usable matches")
+def near_ball(ball_xy, left, right, radius):
+    pl = np.concatenate([left, right], axis=0)
+    return int((np.linalg.norm(pl - ball_xy, axis=1) < radius).sum())
 
 
-# ── PHASE pick ─────────────────────────────────────────────────────────────────
-def choose_hide_set(on, s, e, want_end):
-    """Minimal fixed hide set giving exactly `want_end` players in frame on frame `e`.
+def score_window(log, on, s, e, want):
+    """Return a quality score for [s, e] if it is usable at `want` players, else None.
 
-    ONLY the end count is pinned, so hide as little as possible: of the players in frame
-    on the last frame, hide just the surplus (len(end_in) - want_end) and leave the entire
-    rest of the squad shown. Everyone not in frame at the end stays visible precisely
-    because they are out of shot by then anyway — but they may well be on camera earlier,
-    which is what lets the count fall naturally as the camera tracks away from them.
-
-    BOTH TEAMS MUST SURVIVE. The surplus is chosen per team, not from one pooled ranking.
-    Ranking the whole frame by dwell and cutting the tail wiped out an entire side: 4 of
-    the 5 end-6 clips came out 0 blue / 6 red, because the left team happened to be the
-    one moving through frame and so held the short-dwell places. Six players of one colour
-    and nobody to play against does not read as football. Each team keeps roughly half the
-    quota, and only tops up from the other side when one team genuinely has too few bodies
-    on camera to fill its share.
-
-    Within a team the surplus is still dropped by SHORTEST dwell, so the group that stays
-    on screen is the stable one and the count settles rather than flickering at the frame
-    edge.
-
-    An earlier version kept only end-frame players and hid everyone else. That was wrong
-    for GEN2: it forced n_first <= want_end, so the on-screen count could never fall
-    during a clip, and the start was implicitly pinned — exactly what the brief says not
-    to control.
-
-    Returns (hide_slots, n_first, n_last, per_frame), or None if the window cannot make
-    the requested count (e.g. only 5 bodies are ever on camera and 16 are wanted).
+    Everything here exists to answer one of the four rejections: the ball must be with
+    people (1), the frame must be busy enough to read as football (2), and the play must
+    be live rather than a restart or a jog (3).
     """
-    n_slots = len(on)
-    end_in = [i for i in range(n_slots) if on[i][e]]
-    if len(end_in) < want_end:
+    if int(on[e].sum()) != want:
         return None
-    dwell = {i: sum(on[i][s:e + 1]) for i in range(n_slots)}
 
-    left = [i for i in end_in if ALL_SLOTS[i].startswith("L")]
-    right = [i for i in end_in if ALL_SLOTS[i].startswith("R")]
-    keep_l = min(len(left), want_end // 2)
-    keep_r = min(len(right), want_end - keep_l)
-    keep_l = min(len(left), want_end - keep_r)          # top up if one side is short
-    by_dwell = lambda g: sorted(g, key=lambda i: -dwell[i])          # noqa: E731
-    keep = set(by_dwell(left)[:keep_l]) | set(by_dwell(right)[:keep_r])
-    hidden = set(end_in) - keep
-    shown = [i for i in range(n_slots) if i not in hidden]
-    n_last = sum(1 for i in shown if on[i][e])
-    if n_last != want_end:
+    ball = log["ball"][s:e + 1]
+    if not continuous(ball):
         return None
-    n_first = sum(1 for i in shown if on[i][s])
-    per_frame = [sum(1 for i in shown if on[i][t]) for t in range(s, e + 1)]
-    return [ALL_SLOTS[i] for i in sorted(hidden)], n_first, n_last, per_frame
+
+    gm = log["game_mode"][s:e + 1]
+    if any(m in SETPIECE_MODES for m in gm):
+        return None                      # no set piece, and no restart, anywhere inside
+
+    # 1. the ball is with people, at BOTH ends of the clip — never stranded
+    near_first = near_ball(ball[0][:2], log["left"][s], log["right"][s], NEAR_RADIUS)
+    near_last = near_ball(ball[-1][:2], log["left"][e], log["right"][e], NEAR_RADIUS)
+    if near_first < MIN_NEAR or near_last < MIN_NEAR:
+        return None
+
+    # 2. the ball is actually played, not parked at someone's feet for five seconds
+    travel = float(np.linalg.norm(ball[-1][:2] - ball[0][:2]))
+    path = float(np.linalg.norm(np.diff(ball[:, :2], axis=0), axis=1).sum())
+    if travel < MIN_TRAVEL:
+        return None
+
+    # 3. the visible players are gathered around the play rather than strung out. Mean
+    #    distance from the ball to the on-screen players, lower is tighter.
+    pl = np.concatenate([log["left"][e], log["right"][e]], axis=0)[on[e]]
+    spread = float(np.linalg.norm(pl - ball[-1][:2], axis=1).mean()) if len(pl) else 9.9
+
+    # Prefer: more bodies around the ball, more of the ball moving, tighter grouping.
+    return {"near_first": near_first, "near_last": near_last,
+            "travel": round(travel, 3), "path": round(path, 3),
+            "spread": round(spread, 3),
+            "score": near_last * 3 + near_first * 2 + path * 6 - spread * 8}
 
 
 def phase_pick():
-    """Assign each of the 20 clips its own source match.
+    if not MODEL.exists():
+        sys.exit("no in-frame model — run: python3 calibrate_inframe.py")
+    model = json.loads(MODEL.read_text())
+    print(f"in-frame model: per-frame count exact {model['count_exact']*100:.1f}%, "
+          f"within +-1 {model['count_within1']*100:.1f}%")
 
-    ONE CLIP PER MATCH, GLOBALLY. An earlier version reserved matches per end-count only,
-    which let the same match supply all four counts — and because the windows were offset
-    by just 5 frames, end16_01 and end12_01 came out sharing 45 of their 50 frames. Those
-    are not four clips, they are one passage of play with different players hidden. With
-    matches consumed globally the 20 clips are 20 different matches.
+    files = sorted(SWEEP.glob("*.npz"))
+    if not files:
+        sys.exit(f"no sweep cache in {SWEEP} — run sweep_events.py")
 
-    Hardest count first: 16 needs a crowded frame and only some matches ever have 16
-    bodies on camera at once, while 6 can be made from almost any window — so taking the
-    6s first would eat the crowded matches the 16s depend on.
-    """
-    maps = json.loads(MAP.read_text())
-    usable = {k: v for k, v in maps.items() if v}
-    picks, used_matches = [], set()
+    cands = {w: [] for w in END_COUNTS}
+    for path in files:
+        log = load(path)
+        on = in_frame_mask(log["ball"], log["left"], log["right"], model)
+        T = len(log["ball"])
+        for s in range(SKIP_START, T - CLIP_FRAMES, STRIDE):
+            e = s + CLIP_FRAMES - 1
+            for want in END_COUNTS:
+                r = score_window(log, on, s, e, want)
+                if r is None:
+                    continue
+                cands[want].append({"match": path.stem, "shape": path.stem.rsplit("_s", 1)[0],
+                                    "seed": int(path.stem.rsplit("_s", 1)[1]),
+                                    "start": s, "end": e + 1, "end_count": want, **r})
+
+    picks, used = [], set()
+    # Hardest first: 16 needs a crowded frame and few windows offer it.
     for want in sorted(END_COUNTS, reverse=True):
+        rows = sorted(cands[want], key=lambda d: -d["score"])
         got = 0
-        for key, rec in usable.items():
+        for r in rows:
             if got >= PER_COUNT:
                 break
-            if key in used_matches:
-                continue
-            on = rec["on"]
-            T = len(on[0])
-            for s in range(0, T - CLIP_FRAMES, 5):
-                e = s + CLIP_FRAMES - 1
-                res = choose_hide_set(on, s, e, want)
-                if res is None:
-                    continue
-                hide, n0, n1, per_frame = res
-                picks.append({"key": key, "level": rec["level"], "seed": rec["seed"],
-                              "start": s, "end": e + 1, "end_count": want,
-                              "hide": ",".join(hide), "n_first": n0, "n_last": n1,
-                              "n_hidden": len(hide), "in_frame_per_frame": per_frame})
-                used_matches.add(key)
-                got += 1
-                break
-        print(f"  end_count={want:2d}: {got}/{PER_COUNT}")
-    n_matches = len({p['key'] for p in picks})
-    print(f"phase pick: {len(picks)} windows from {n_matches} distinct matches "
-          f"({len(usable)} usable) -> {PICKS}")
-    if n_matches < len(picks):
-        print("  WARNING: a match is reused — probe more base matches for full diversity")
-    PICKS.write_text(json.dumps(picks, indent=2))
+            if r["match"] in used:
+                continue            # one clip per match — 20 clips from 20 matches
+            used.add(r["match"])
+            picks.append(r)
+            got += 1
+        print(f"  end_count={want:2d}: {got}/{PER_COUNT} chosen from "
+              f"{len(cands[want])} candidate windows")
+    PD.mkdir(parents=True, exist_ok=True)
+    PICKS.write_text(json.dumps(picks, indent=2, default=float))
+    print(f"phase pick: {len(picks)} windows from {len({p['match'] for p in picks})} "
+          f"distinct matches -> {PICKS}")
 
 
-# ── PHASE vis / inv ────────────────────────────────────────────────────────────
-def _render(bundle, tagname):
-    from lib import use_bundle
+def _levels():
     from scenario_factory import write_scenario
+    return {name: write_scenario(shape_spec(name), force=True) for name, *_ in SHAPES}
+
+
+def _render(bundle, tag):
+    from lib import use_bundle
     use_bundle(bundle)
-    for _name, spec in bases():
-        write_scenario(spec, force=True)     # levels must match what was probed
+    levels = _levels()
     picks = json.loads(PICKS.read_text())
     for i, p in enumerate(picks):
-        frames, _b = render_window(p["level"], p["seed"], p["start"], p["end"],
-                                   hide_slots=p["hide"])
-        np.savez_compressed(PD / f"pd{i:02d}_{tagname}.npz", frames=np.array(frames))
-        print(f"  [{tagname}] {p['key']} end={p['end_count']} ({len(frames)} frames)",
+        # hide_slots stays empty: every one of the 22 players is rendered.
+        frames, balls = render_window(levels[p["shape"]], p["seed"], p["start"], p["end"])
+        np.savez_compressed(PD / f"nd{i:02d}_{tag}.npz", frames=np.array(frames))
+        print(f"  [{tag}] {p['match']} end={p['end_count']} ({len(frames)} frames)",
               flush=True)
 
 
@@ -238,30 +193,33 @@ def phase_inv():
     _render(BUNDLE_INV, "inv")
 
 
-# ── PHASE compose ──────────────────────────────────────────────────────────────
 def phase_compose():
     from grid import cell_of
     picks = json.loads(PICKS.read_text())
-    rows = [("clip", "end_count", "players_in_frame_first", "players_in_frame_last",
-             "players_in_play", "hidden_slots", "level", "seed", "start_frame",
-             "end_frame", "n_frames", "seconds", "ball_start_cell", "start_px",
-             "start_py", "ball_final_cell", "final_px", "final_py")]
+    rows = [("clip", "end_count", "players_in_frame_last", "players_in_play",
+             "players_hidden", "near_ball_first", "near_ball_last", "ball_path",
+             "shape", "seed", "match", "start_frame", "end_frame", "n_frames", "seconds",
+             "ball_start_cell", "start_px", "start_py",
+             "ball_final_cell", "final_px", "final_py")]
     counters = {}
     for i, p in enumerate(picks):
-        vis = np.load(PD / f"pd{i:02d}_vis.npz")["frames"]
-        inv = np.load(PD / f"pd{i:02d}_inv.npz")["frames"]
+        vis = np.load(PD / f"nd{i:02d}_vis.npz")["frames"]
+        inv = np.load(PD / f"nd{i:02d}_inv.npz")["frames"]
         full, split, (spx, spy), (fpx, fpy) = compose_pair(vis, inv)
         n = counters.get(p["end_count"], 0) + 1
         counters[p["end_count"]] = n
         clip = f"end{p['end_count']:02d}_{n:02d}"
         write_clip(full, OUT / "full_visibility" / f"{clip}.mov")
         write_clip(split, OUT / "split_1s_4s" / f"{clip}.mov")
-        rows.append((clip, p["end_count"], p["n_first"], p["n_last"], 22, p["n_hidden"],
-                     p["level"], p["seed"], p["start"], p["end"], len(full),
-                     round(len(full) / 10, 1), cell_of(spx, spy), round(spx, 1),
-                     round(spy, 1), cell_of(fpx, fpy), round(fpx, 1), round(fpy, 1)))
-        print(f"  [compose] {clip}: in frame {p['n_first']} -> {p['n_last']}, "
-              f"ball {cell_of(spx, spy)} -> {cell_of(fpx, fpy)}")
+        rows.append((clip, p["end_count"], p["end_count"], 22, 0,
+                     p["near_first"], p["near_last"], p["path"],
+                     p["shape"], p["seed"], p["match"], p["start"], p["end"],
+                     len(full), round(len(full) / 10, 1),
+                     cell_of(spx, spy), round(spx, 1), round(spy, 1),
+                     cell_of(fpx, fpy), round(fpx, 1), round(fpy, 1)))
+        print(f"  [compose] {clip}: {p['end_count']} in frame, "
+              f"{p['near_last']} near the ball, ball {cell_of(spx, spy)} -> "
+              f"{cell_of(fpx, fpy)}")
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "ground_truth.csv").write_text(
         "\n".join(",".join(map(str, r)) for r in rows) + "\n")
@@ -269,12 +227,12 @@ def phase_compose():
 
 
 def phase_all():
-    for mode in ("probe", "pick", "vis", "inv", "compose"):
+    for mode in ("pick", "vis", "inv", "compose"):
         print(f"\n===== phase {mode} =====", flush=True)
         subprocess.run([sys.executable, __file__, mode], check=True)
 
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
-    {"probe": phase_probe, "pick": phase_pick, "vis": phase_vis, "inv": phase_inv,
+    {"pick": phase_pick, "vis": phase_vis, "inv": phase_inv,
      "compose": phase_compose, "all": phase_all}[mode]()

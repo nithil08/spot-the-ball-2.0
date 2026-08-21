@@ -1,0 +1,11 @@
+clip,situation,shape,seed,match,start_frame,end_frame,n_frames,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,detail
+goalkeeper_throw_01,gk_throw,pressR,20,pressR_s020,835,885,50,5.0,C13,962.9,175.8,C11,817.0,239.0,{"anchor": 850; "catch": 809; "hand_frames": 35; "apex": 3.7; "travel": 0.519; "score": 86.92757248878479}
+goalkeeper_throw_02,gk_throw,flankL,40,flankL_s040,106,156,50,5.0,C12,949.1,163.1,B10,727.3,157.7,{"anchor": 121; "catch": 82; "hand_frames": 38; "apex": 6.41; "travel": 0.42; "score": 80.00597405433655}
+goalkeeper_throw_03,gk_throw,midpush,8,midpush_s008,767,817,50,5.0,C13,974.9,219.0,A10,762.7,34.1,{"anchor": 782; "catch": 756; "hand_frames": 11; "apex": 3.7; "travel": 0.674; "score": 78.42335557937622}
+goalkeeper_throw_04,gk_throw,flankL,21,flankL_s021,802,852,50,5.0,C4,284.4,160.3,C6,472.7,215.8,{"anchor": 817; "catch": 775; "hand_frames": 41; "apex": 4.06; "travel": 0.335; "score": 74.45368802547455}
+goalkeeper_throw_05,gk_throw,balanced,33,balanced_s033,982,1032,50,5.0,B4,312.2,156.1,B8,574.6,151.4,{"anchor": 997; "catch": 956; "hand_frames": 27; "apex": 3.55; "travel": 0.439; "score": 70.88673603534698}
+goalkeeper_throw_06,gk_throw,balanced,31,balanced_s031,317,367,50,5.0,C5,336.9,166.6,C7,517.7,215.8,{"anchor": 332; "catch": 291; "hand_frames": 30; "apex": 3.16; "travel": 0.402; "score": 70.22435247898102}
+goalkeeper_throw_07,gk_throw,boxL,39,boxL_s039,302,352,50,5.0,C12,890.4,165.9,D10,797.3,242.8,{"anchor": 317; "catch": 277; "hand_frames": 37; "apex": 3.38; "travel": 0.317; "score": 68.66818022727966}
+goalkeeper_throw_08,gk_throw,pressL2,48,pressL2_s048,921,971,50,5.0,B12,917.5,151.5,B12,955.7,86.3,{"anchor": 936; "catch": 907; "hand_frames": 22; "apex": 4.17; "travel": 0.402; "score": 62.1624321937561}
+goalkeeper_throw_09,gk_throw,boxL,37,boxL_s037,983,1033,50,5.0,B5,341.3,153.8,B7,520.4,145.0,{"anchor": 998; "catch": 957; "hand_frames": 27; "apex": 3.41; "travel": 0.351; "score": 62.07152795791626}
+goalkeeper_throw_10,gk_throw,balanced,51,balanced_s051,813,863,50,5.0,B5,323.1,153.5,B9,707.2,130.5,{"anchor": 828; "catch": 787; "hand_frames": 27; "apex": 3.46; "travel": 0.35; "score": 62.04996597766876}
