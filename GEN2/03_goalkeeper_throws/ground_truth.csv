@@ -1,2 +1,0 @@
-clip,situation,shape,seed,match,start_frame,end_frame,n_frames,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,detail
-goalkeeper_throw_01,gk_throw,flankL,1,flankL_s001,170,220,50,5.0,C6,441.8,204.4,C8,580.7,172.7,{"anchor": 185; "catch": 166; "hand_frames": 8; "apex": 4.37; "travel": 0.51; "score": 58.97026228904724}

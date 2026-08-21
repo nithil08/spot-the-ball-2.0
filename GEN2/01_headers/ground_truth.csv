@@ -1,3 +1,0 @@
-clip,situation,shape,seed,match,start_frame,end_frame,n_frames,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,detail
-header_01,header,pressR,3,pressR_s003,479,529,50,5.0,C8,599.8,227.6,C9,713.9,215.4,{"anchor": 499; "z": 1.63; "contested_by": 3; "apex_in": 1.74; "turn_cos": 0.27; "score": 31.73564064502716}
-header_02,header,boxL,3,boxL_s003,77,127,50,5.0,C9,704.3,228.4,A9,658.9,43.9,{"anchor": 97; "z": 2.79; "contested_by": 1; "apex_in": 2.79; "turn_cos": -0.98; "score": 12.787748336791992}

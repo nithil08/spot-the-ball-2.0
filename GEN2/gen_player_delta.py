@@ -152,23 +152,32 @@ def choose_hide_set(on, s, e, want_end):
 
 
 def phase_pick():
+    """Assign each of the 20 clips its own source match.
+
+    ONE CLIP PER MATCH, GLOBALLY. An earlier version reserved matches per end-count only,
+    which let the same match supply all four counts — and because the windows were offset
+    by just 5 frames, end16_01 and end12_01 came out sharing 45 of their 50 frames. Those
+    are not four clips, they are one passage of play with different players hidden. With
+    matches consumed globally the 20 clips are 20 different matches.
+
+    Hardest count first: 16 needs a crowded frame and only some matches ever have 16
+    bodies on camera at once, while 6 can be made from almost any window — so taking the
+    6s first would eat the crowded matches the 16s depend on.
+    """
     maps = json.loads(MAP.read_text())
     usable = {k: v for k, v in maps.items() if v}
-    picks, used = [], set()
-    # Fill the hardest counts first: 16 needs a crowded frame and few windows offer it,
-    # while 6 can be made from almost any window, so grabbing 6s first would eat the
-    # windows the 16s depend on.
+    picks, used_matches = [], set()
     for want in sorted(END_COUNTS, reverse=True):
         got = 0
         for key, rec in usable.items():
             if got >= PER_COUNT:
                 break
+            if key in used_matches:
+                continue
             on = rec["on"]
             T = len(on[0])
             for s in range(0, T - CLIP_FRAMES, 5):
                 e = s + CLIP_FRAMES - 1
-                if (key, s) in used:
-                    continue
                 res = choose_hide_set(on, s, e, want)
                 if res is None:
                     continue
@@ -177,12 +186,16 @@ def phase_pick():
                               "start": s, "end": e + 1, "end_count": want,
                               "hide": ",".join(hide), "n_first": n0, "n_last": n1,
                               "n_hidden": len(hide), "in_frame_per_frame": per_frame})
-                used.add((key, s))
+                used_matches.add(key)
                 got += 1
-                break                    # one window per match keeps the clips distinct
+                break
         print(f"  end_count={want:2d}: {got}/{PER_COUNT}")
+    n_matches = len({p['key'] for p in picks})
+    print(f"phase pick: {len(picks)} windows from {n_matches} distinct matches "
+          f"({len(usable)} usable) -> {PICKS}")
+    if n_matches < len(picks):
+        print("  WARNING: a match is reused — probe more base matches for full diversity")
     PICKS.write_text(json.dumps(picks, indent=2))
-    print(f"phase pick: {len(picks)} windows -> {PICKS}")
 
 
 # ── PHASE vis / inv ────────────────────────────────────────────────────────────

@@ -1,2 +1,0 @@
-clip,situation,shape,seed,match,start_frame,end_frame,n_frames,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,detail
-corner_kick_01,corner,flankR,1,flankR_s001,817,867,50,5.0,F7,522.3,427.4,C7,531.9,212.7,{"anchor": 821; "award": 816; "min_start": 817; "apex": 4.59; "contested_by": 6; "score": 64.58623695373535}
