@@ -81,3 +81,6 @@ MATCH_SITUATIONS/_events/
 # Asset bundles are multi-hundred-MB copies of the engine data dir; rebuild with
 # build_bundles.py / build_noname_bundles.py / apply_gen2_kits.py
 experiments/asset_bundles/
+
+# GEN2 intermediates: sweep logs, per-window frame npz, probe maps (all regenerable)
+GEN2/_cache/
