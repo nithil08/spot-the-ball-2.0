@@ -8,8 +8,14 @@ re-run and re-tuned many times, so it must not require replaying the engine.
 Resumable by design — an already-cached pair is skipped, so this can be killed and
 restarted freely, and the picker can start working off a partial sweep.
 
-Run:  python3 sweep_events.py [n_seeds] [steps]
-      python3 sweep_events.py 40 1100        # ~480 matches
+Shardable too: `--shard i/n` takes every nth job, so several workers can sweep in
+parallel without duplicating each other. Sharding is what makes the sweep tractable —
+a single worker is ~13 s per match, so 720 matches is ~3 h of wall clock, and the
+sweep is the critical path for everything downstream.
+
+Run:  python3 sweep_events.py [n_seeds] [steps] [--shard i/n]
+      python3 sweep_events.py 60 1100                 # one worker, 720 matches
+      for i in 0 1 2; do python3 sweep_events.py 60 1100 --shard $i/3 & done
 """
 import sys
 import time
@@ -34,9 +40,21 @@ def summarise(log):
     return corners, fks, gk, goals
 
 
+def parse_shard(argv):
+    for a in argv:
+        if a.startswith("--shard"):
+            i, n = a.split("=")[-1].split("/") if "=" in a else argv[argv.index(a) + 1].split("/")
+            return int(i), int(n)
+    return 0, 1
+
+
 def main():
-    n_seeds = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_SEEDS
-    steps = int(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_STEPS
+    pos = [a for a in sys.argv[1:] if not a.startswith("--")]
+    shard_i, shard_n = parse_shard(sys.argv[1:])
+    if shard_n > 1:
+        pos = pos[:2]                       # drop the "i/n" that follows --shard
+    n_seeds = int(pos[0]) if len(pos) > 0 else DEFAULT_SEEDS
+    steps = int(pos[1]) if len(pos) > 1 else DEFAULT_STEPS
     seeds = list(range(1, n_seeds + 1))
 
     from lib import use_bundle
@@ -44,13 +62,16 @@ def main():
     use_bundle("gen2")
 
     SWEEP.mkdir(parents=True, exist_ok=True)
-    # Scenario modules depend only on the shape, so write each one once.
-    levels = {name: write_scenario(shape_spec(name), force=True)
+    # Scenario modules depend only on the shape, so write each one once. Workers other
+    # than shard 0 reuse whatever is already on disk — force=True from several processes
+    # at once would have them rewriting the same files under each other.
+    levels = {name: write_scenario(shape_spec(name), force=(shard_i == 0))
               for name, *_ in SHAPES}
 
-    jobs = list(sweep_jobs(seeds))
+    jobs = [j for k, j in enumerate(sweep_jobs(seeds)) if k % shard_n == shard_i]
     todo = [(sh, sd) for sh, sd in jobs if not (SWEEP / f"{tag(sh, sd)}.npz").exists()]
-    print(f"{len(jobs)} matches ({len(SHAPES)} shapes x {n_seeds} seeds), "
+    print(f"shard {shard_i}/{shard_n}: {len(jobs)} matches of "
+          f"{len(SHAPES) * n_seeds} ({len(SHAPES)} shapes x {n_seeds} seeds), "
           f"{len(jobs) - len(todo)} already cached, {len(todo)} to play", flush=True)
 
     t0 = time.time()
