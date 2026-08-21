@@ -20,7 +20,10 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SRC = "/Users/nithilbalamurugan/gfootball_src"
-EXP = "/Users/nithilbalamurugan/Desktop/Nithil Research/code/spot-the-ball-2.0/experiments"
+# Repo root = the nearest ancestor holding experiments/; keeps working if the
+# checkout is moved (it was, from code/spot-the-ball-2.0 to the Desktop root).
+EXP = str(next(p for p in Path(__file__).resolve().parents
+               if (p / "experiments").is_dir()) / "experiments")
 for _p in (SRC, SRC + "/third_party", EXP, str(HERE)):
     if _p not in sys.path:
         sys.path.insert(0, _p)

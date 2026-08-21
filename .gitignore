@@ -77,3 +77,7 @@ MATCH_SITUATIONS/_events/
 
 # Ground-truth debug overlays (regenerable renders)
 **/_gt_debug/
+
+# Asset bundles are multi-hundred-MB copies of the engine data dir; rebuild with
+# build_bundles.py / build_noname_bundles.py / apply_gen2_kits.py
+experiments/asset_bundles/
