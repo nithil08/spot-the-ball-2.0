@@ -1,0 +1,6 @@
+clip,situation,level,key_frame,start_frame,end_frame,n_frames,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,detail
+goalkeeper_throw_01,gk_throw,ms_v27,633,623,695,72,7.2,C11,806.7,163.3,C9,715.5,167.0,{"level": "ms_v27"; "catch": 633; "hand_frames": 4; "release": 647; "apex": 4.59; "travel": 0.609; "score": 64.9}
+goalkeeper_throw_02,gk_throw,ms_v20,651,641,713,72,7.2,C6,431.7,221.1,B7,537.0,101.4,{"level": "ms_v20"; "catch": 651; "hand_frames": 5; "release": 663; "apex": 6.64; "travel": 0.584; "score": 63.4}
+goalkeeper_throw_03,gk_throw,ms_v37,658,648,720,72,7.2,C6,437.1,208.0,C6,453.0,213.2,{"level": "ms_v37"; "catch": 658; "hand_frames": 15; "release": 680; "apex": 4.73; "travel": 0.294; "score": 44.4}
+goalkeeper_throw_04,gk_throw,ms_v05,118,108,180,72,7.2,C11,863.0,177.0,A10,798.5,65.7,{"level": "ms_v05"; "catch": 118; "hand_frames": 13; "release": 137; "apex": 4.0; "travel": 0.261; "score": 39.1}
+goalkeeper_throw_05,gk_throw,ms_v15,434,424,496,72,7.2,C6,437.5,186.4,C7,499.7,205.5,{"level": "ms_v15"; "catch": 434; "hand_frames": 9; "release": 454; "apex": 3.68; "travel": 0.226; "score": 31.6}

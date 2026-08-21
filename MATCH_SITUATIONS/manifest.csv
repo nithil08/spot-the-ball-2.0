@@ -1,0 +1,5 @@
+"clip","level","start_frame","end_frame","n_frames","seconds","situation","what_to_watch"
+"header","ms_v27","186","252","66","6.6","Aerial duel won with a header in midfield","long ball drops from ~9.6 m; three players contest it; header at ~2.5 m on frame 207"
+"corner_kick","ms_v16","80","168","88","8.8","Corner kick (Law 17) awarded by the engine referee","ball on the corner arc, box loaded, delivery ~5.5 m into the six-yard area, cleared"
+"free_kick","ms_v39","661","742","81","8.1","Attacking free kick (Law 13) awarded for a foul ~25 yds out","ball spotted at x=0.81, defenders dropped in front of it, delivery headed on frame 692"
+"goalkeeper_throw","ms_v20","643","726","83","8.3","Goalkeeper gathers and throws the ball out by hand (Law 12 distribution)","ball held at 1.35 m in his hands (f658-661), overarm throw released f664, carries ~6.6 m high from the goal line to the halfway line"

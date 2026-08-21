@@ -1,0 +1,22 @@
+{
+  "before": {
+    "n": 30,
+    "occupied": 15,
+    "top": 6,
+    "top_pct": 20.0,
+    "rows_used": 3,
+    "cols_used": 8,
+    "px_sd": 140.77103478107043,
+    "py_sd": 40.64790878863129
+  },
+  "after": {
+    "n": 30,
+    "occupied": 22,
+    "top": 3,
+    "top_pct": 10.0,
+    "rows_used": 6,
+    "cols_used": 11,
+    "px_sd": 219.07847564032593,
+    "py_sd": 85.11209895713351
+  }
+}

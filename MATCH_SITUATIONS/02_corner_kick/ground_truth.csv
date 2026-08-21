@@ -1,0 +1,6 @@
+clip,situation,level,key_frame,start_frame,end_frame,n_frames,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,detail
+corner_kick_01,corner,pr_v26,503,503,583,80,8.0,A10,751.2,63.1,C9,658.5,194.9,{"level": "pr_v26"; "frame": 503; "apex": 5.22; "contested_by": 5; "score": 55.218600273132324}
+corner_kick_02,corner,pr_v21,37,37,117,80,8.0,A10,751.2,62.9,C9,706.7,161.8,{"level": "pr_v21"; "frame": 37; "apex": 4.67; "contested_by": 5; "score": 54.67009925842285}
+corner_kick_03,corner,pr_v19,181,181,261,80,8.0,A10,751.2,63.1,C12,916.3,169.5,{"level": "pr_v19"; "frame": 181; "apex": 5.4; "contested_by": 4; "score": 45.40013408660889}
+corner_kick_04,corner,wd_v35,205,205,285,80,8.0,F11,808.9,427.8,C10,739.2,182.9,{"level": "wd_v35"; "frame": 205; "apex": 7.43; "contested_by": 3; "score": 37.42658281326294}
+corner_kick_05,corner,ms_v23,268,268,348,80,8.0,A10,751.2,63.1,B8,577.0,147.8,{"level": "ms_v23"; "frame": 268; "apex": 6.43; "contested_by": 4; "score": 46.4}

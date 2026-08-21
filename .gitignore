@@ -69,3 +69,11 @@ Thumbs.db
 # Rendered frame PNGs under generated result/data trees (code + small text artifacts still tracked)
 experiments/nithil_work/results/**/*.png
 data/videos/**/*.png
+
+# MATCH_SITUATIONS intermediates (probe sheets, frame caches, event dumps — regenerable)
+MATCH_SITUATIONS/_probe/
+MATCH_SITUATIONS/_frames/
+MATCH_SITUATIONS/_events/
+
+# Ground-truth debug overlays (regenerable renders)
+**/_gt_debug/

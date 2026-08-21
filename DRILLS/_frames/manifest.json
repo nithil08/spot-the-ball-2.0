@@ -1,0 +1,163 @@
+[
+  {
+    "drill": 1,
+    "variant": 0,
+    "level": "drill1_4v4_small_sided_v1",
+    "seed": 42,
+    "name": "drill1_4v4_small_sided_v1"
+  },
+  {
+    "drill": 1,
+    "variant": 1,
+    "level": "drill1_4v4_small_sided_v2",
+    "seed": 42,
+    "name": "drill1_4v4_small_sided_v2"
+  },
+  {
+    "drill": 1,
+    "variant": 2,
+    "level": "drill1_4v4_small_sided_v3",
+    "seed": 42,
+    "name": "drill1_4v4_small_sided_v3"
+  },
+  {
+    "drill": 2,
+    "variant": 0,
+    "level": "drill2_3v1_rondo_v1",
+    "seed": 42,
+    "name": "drill2_3v1_rondo_v1"
+  },
+  {
+    "drill": 2,
+    "variant": 1,
+    "level": "drill2_3v1_rondo_v2",
+    "seed": 42,
+    "name": "drill2_3v1_rondo_v2"
+  },
+  {
+    "drill": 2,
+    "variant": 2,
+    "level": "drill2_3v1_rondo_v3",
+    "seed": 42,
+    "name": "drill2_3v1_rondo_v3"
+  },
+  {
+    "drill": 3,
+    "variant": 0,
+    "level": "drill3_5v2_rondo_v1",
+    "seed": 42,
+    "name": "drill3_5v2_rondo_v1"
+  },
+  {
+    "drill": 3,
+    "variant": 1,
+    "level": "drill3_5v2_rondo_v2",
+    "seed": 42,
+    "name": "drill3_5v2_rondo_v2"
+  },
+  {
+    "drill": 3,
+    "variant": 2,
+    "level": "drill3_5v2_rondo_v3",
+    "seed": 42,
+    "name": "drill3_5v2_rondo_v3"
+  },
+  {
+    "drill": 4,
+    "variant": 0,
+    "level": "drill4_fast_break_3v2_v1",
+    "seed": 42,
+    "name": "drill4_fast_break_3v2_v1"
+  },
+  {
+    "drill": 4,
+    "variant": 1,
+    "level": "drill4_fast_break_3v2_v2",
+    "seed": 42,
+    "name": "drill4_fast_break_3v2_v2"
+  },
+  {
+    "drill": 4,
+    "variant": 2,
+    "level": "drill4_fast_break_3v2_v3",
+    "seed": 42,
+    "name": "drill4_fast_break_3v2_v3"
+  },
+  {
+    "drill": 5,
+    "variant": 0,
+    "level": "drill5_wing_cross_v1",
+    "seed": 42,
+    "name": "drill5_wing_cross_v1"
+  },
+  {
+    "drill": 5,
+    "variant": 1,
+    "level": "drill5_wing_cross_v2",
+    "seed": 42,
+    "name": "drill5_wing_cross_v2"
+  },
+  {
+    "drill": 5,
+    "variant": 2,
+    "level": "drill5_wing_cross_v3",
+    "seed": 42,
+    "name": "drill5_wing_cross_v3"
+  },
+  {
+    "drill": 6,
+    "variant": 0,
+    "level": "drill6_switch_of_play_v1",
+    "seed": 42,
+    "name": "drill6_switch_of_play_v1"
+  },
+  {
+    "drill": 6,
+    "variant": 1,
+    "level": "drill6_switch_of_play_v2",
+    "seed": 42,
+    "name": "drill6_switch_of_play_v2"
+  },
+  {
+    "drill": 6,
+    "variant": 2,
+    "level": "drill6_switch_of_play_v3",
+    "seed": 42,
+    "name": "drill6_switch_of_play_v3"
+  },
+  {
+    "drill": 7,
+    "variant": 0,
+    "level": "drill7_free_kick_v1",
+    "seed": 42,
+    "name": "drill7_free_kick_v1"
+  },
+  {
+    "drill": 7,
+    "variant": 1,
+    "level": "drill7_free_kick_v2",
+    "seed": 42,
+    "name": "drill7_free_kick_v2"
+  },
+  {
+    "drill": 7,
+    "variant": 2,
+    "level": "drill7_free_kick_v3",
+    "seed": 42,
+    "name": "drill7_free_kick_v3"
+  },
+  {
+    "drill": 8,
+    "variant": 0,
+    "level": "drill8_corner_kick_v1",
+    "seed": 42,
+    "name": "drill8_corner_kick_v1"
+  },
+  {
+    "drill": 8,
+    "variant": 1,
+    "level": "drill8_corner_kick_v2",
+    "seed": 42,
+    "name": "drill8_corner_kick_v2"
+  }
+]

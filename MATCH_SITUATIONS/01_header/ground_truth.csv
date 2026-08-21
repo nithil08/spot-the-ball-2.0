@@ -1,0 +1,6 @@
+clip,situation,level,key_frame,start_frame,end_frame,n_frames,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,detail
+header_01,header,ms_v27,207,185,251,66,6.6,A7,505.4,16.6,C9,653.3,177.0,{"level": "ms_v27"; "frame": 207; "z": 2.47; "contested_by": 3; "apex_in": 9.61; "score": 39.6}
+header_02,header,ms_v05,575,553,619,66,6.6,A7,523.9,34.5,C11,825.4,187.2,{"level": "ms_v05"; "frame": 575; "z": 1.98; "contested_by": 3; "apex_in": 9.3; "score": 39.3}
+header_03,header,ms_v27,891,869,935,66,6.6,C7,486.0,203.6,C8,592.7,237.7,{"level": "ms_v27"; "frame": 891; "z": 2.12; "contested_by": 2; "apex_in": 5.82; "score": 25.8}
+header_04,header,ms_v11,840,818,884,66,6.6,B10,723.2,130.6,C8,572.8,188.1,{"level": "ms_v11"; "frame": 840; "z": 1.62; "contested_by": 2; "apex_in": 1.9; "score": 21.9}
+header_05,header,ms_v13,612,590,656,66,6.6,C9,702.0,178.0,C12,904.9,194.0,{"level": "ms_v13"; "frame": 612; "z": 1.32; "contested_by": 2; "apex_in": 2.4; "score": 22.4}
