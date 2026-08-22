@@ -216,19 +216,30 @@ def _probe_setup(shard_i):
         write_scenario(spec, force=(shard_i == 0))
 
 
+EXIT_DONE = 3          # this shard has nothing left — the ONLY reason to stop looping
+
+
 def phase_probe_one():
     """Probe ONE unprobed match from this shard, then exit.
 
-    Exit 0 = did work, exit 1 = nothing left. Driven from a shell `while` loop so each
-    match gets a fresh process — the engine leaks resources and a process dies at roughly
-    its 46th FootballEnv, which is two matches' worth of passes. See the module docstring.
+    Exit codes matter here, because the driving shell loop has to tell two very different
+    things apart:
+        0            did one match, call me again
+        EXIT_DONE(3) shard is empty, stop looping
+        anything else — including being killed outright — means the process DIED, and the
+                     loop must retry rather than stop.
+
+    An earlier version exited 1 for "nothing left", which is indistinguishable from a
+    crash. The engine kills the process partway through (see the module docstring on the
+    ~46-env leak), so every shard stopped after its first successful match and the probe
+    finished with 13 of 39 maps while reporting success.
     """
     shard_i, shard_n = parse_shard(sys.argv[2:])
     _probe_setup(shard_i)
     todo = _shard_todo(shard_i, shard_n)
     if not todo:
         print(f"shard {shard_i}/{shard_n}: nothing left to probe")
-        sys.exit(1)
+        sys.exit(EXIT_DONE)
     lvl, seed = todo[0]
     print(f"shard {shard_i}/{shard_n}: {len(todo)} left, probing {lvl}_s{seed}", flush=True)
     probe_match(lvl, seed)

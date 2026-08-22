@@ -48,10 +48,29 @@ PRE
 
 # ── 1. probe the remaining player-delta matches, 4 shards, one match per process ──
 step "probe (one match per process; 4 shards)"
+# Exit 3 means "shard empty" and is the ONLY reason to stop. Any other non-zero means
+# the process died mid-match (the ~46-env engine leak) and must simply be retried with a
+# fresh one — an earlier version treated a crash as "empty" and quietly finished the probe
+# with 13 of 39 maps. `fails` caps the retries so a genuinely broken shard cannot spin.
 for i in 0 1 2 3; do
   (
-    while "$PY" gen_player_delta.py probe_one --shard "$i/4" >> "_cache/pdprobe_$i.log" 2>&1; do
-      :
+    fails=0
+    while true; do
+      "$PY" gen_player_delta.py probe_one --shard "$i/4" >> "_cache/pdprobe_$i.log" 2>&1
+      rc=$?
+      if [ "$rc" -eq 3 ]; then
+        echo "shard $i: complete" >> "_cache/pdprobe_$i.log"
+        break
+      elif [ "$rc" -ne 0 ]; then
+        fails=$((fails + 1))
+        echo "shard $i: probe process died (rc=$rc), retry $fails" >> "_cache/pdprobe_$i.log"
+        if [ "$fails" -ge 25 ]; then
+          echo "shard $i: giving up after $fails crashes" >> "_cache/pdprobe_$i.log"
+          break
+        fi
+      else
+        fails=0
+      fi
     done
   ) &
 done
