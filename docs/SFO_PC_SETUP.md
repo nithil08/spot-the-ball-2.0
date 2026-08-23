@@ -8,6 +8,13 @@ Budget ~20 minutes, most of it waiting on downloads. You need an **administrator
 Anything in `PowerShell (Admin)` means: right-click Start → "Terminal (Admin)" or
 "Windows PowerShell (Admin)".
 
+> **Do not upgrade Windows, and do not pay for anything.** Everything below works on
+> Windows **Home** exactly as it does on Pro. If you have heard that remote access to a
+> Windows machine costs about $100, that is **Remote Desktop (RDP)**, whose *host* side is
+> Pro-only — the Home → Pro upgrade is $99.99. We are not using RDP. We are using SSH,
+> which ships free with every edition. If you find the "Enable Remote Desktop" toggle
+> greyed out or missing, that is expected and nothing is wrong.
+
 ---
 
 ## 1. Install Tailscale
