@@ -22,6 +22,21 @@ cd "/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2" || 
 # numpy at all. Pin the framework build that actually has numpy and gfootball.
 PY=/Library/Frameworks/Python.framework/Versions/3.14/bin/python3
 
+# ── thermal throttle ────────────────────────────────────────────────────────────
+# This machine has 4 performance cores. The probe used to launch 4 shards at default
+# QoS, which pins every P-core at max clock and overheats the laptop. Two knobs:
+#
+#   SHARDS   how many probe processes run at once (default 2, was 4)
+#   COOL     1 = run the engine at background QoS via taskpolicy -b, which parks it
+#            on the 6 efficiency cores. Much slower per match, far less heat.
+#            0 = full speed (use when on mains power with good airflow).
+#
+#   SHARDS=1 COOL=1 ./run_tonight.sh     # coolest
+#   SHARDS=4 COOL=0 ./run_tonight.sh     # the old, hot behaviour
+SHARDS=${SHARDS:-2}
+COOL=${COOL:-1}
+if [ "$COOL" = "1" ]; then RUN="/usr/sbin/taskpolicy -b"; else RUN=""; fi
+
 LOG="_cache/run_tonight.log"
 mkdir -p _cache
 exec >> "$LOG" 2>&1
@@ -46,17 +61,17 @@ assert len(frames) == 3 and frames[0].shape == (480, 1280, 3), frames[0].shape
 print("preflight OK: engine renders", frames[0].shape)
 PRE
 
-# ── 1. probe the remaining player-delta matches, 4 shards, one match per process ──
-step "probe (one match per process; 4 shards)"
+# ── 1. probe the remaining player-delta matches, one match per process ───────────
+step "probe (one match per process; $SHARDS shards, COOL=$COOL)"
 # Exit 3 means "shard empty" and is the ONLY reason to stop. Any other non-zero means
 # the process died mid-match (the ~46-env engine leak) and must simply be retried with a
 # fresh one — an earlier version treated a crash as "empty" and quietly finished the probe
 # with 13 of 39 maps. `fails` caps the retries so a genuinely broken shard cannot spin.
-for i in 0 1 2 3; do
+for i in $(seq 0 $((SHARDS - 1))); do
   (
     fails=0
     while true; do
-      "$PY" gen_player_delta.py probe_one --shard "$i/4" >> "_cache/pdprobe_$i.log" 2>&1
+      $RUN "$PY" gen_player_delta.py probe_one --shard "$i/$SHARDS" >> "_cache/pdprobe_$i.log" 2>&1
       rc=$?
       if [ "$rc" -eq 3 ]; then
         echo "shard $i: complete" >> "_cache/pdprobe_$i.log"
@@ -82,10 +97,10 @@ step "pick"
 "$PY" gen_player_delta.py pick || { echo "PICK FAILED"; exit 1; }
 
 step "render visible"
-"$PY" gen_player_delta.py vis || { echo "VIS FAILED"; exit 1; }
+$RUN "$PY" gen_player_delta.py vis || { echo "VIS FAILED"; exit 1; }
 
 step "render invisible"
-"$PY" gen_player_delta.py inv || { echo "INV FAILED"; exit 1; }
+$RUN "$PY" gen_player_delta.py inv || { echo "INV FAILED"; exit 1; }
 
 step "compose"
 "$PY" gen_player_delta.py compose || { echo "COMPOSE FAILED"; exit 1; }
