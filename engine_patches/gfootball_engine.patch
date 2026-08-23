@@ -1,0 +1,196 @@
+diff --git a/setup.py b/setup.py
+index f6ef750..f325131 100644
+--- a/setup.py
++++ b/setup.py
+@@ -63,6 +63,7 @@ class CustomBuild(build_ext):
+                        'variable as int. Please set it to 0 or 1')
+ 
+     if use_prebuilt_lib:
++      os.makedirs(dest_dir, exist_ok=True)
+       if os.system(
+             'cp third_party/gfootball_engine/lib/prebuilt_gameplayfootball.so ' +
+             dest_dir + '/_gameplayfootball.so'):
+@@ -185,7 +186,7 @@ setup(
+         'opencv-python',
+         'psutil',
+         'numpy',
+-        'gym<=0.21.0',
++        'gym>=0.21.0',
+         'absl-py',
+         'wheel',
+     ],
+diff --git a/third_party/gfootball_engine/CMakeLists.txt b/third_party/gfootball_engine/CMakeLists.txt
+index 65c811a..50d0975 100644
+--- a/third_party/gfootball_engine/CMakeLists.txt
++++ b/third_party/gfootball_engine/CMakeLists.txt
+@@ -123,7 +123,12 @@ else()
+ endif()
+ message("Using Boost.Python: ${BOOST_PYTHON_VERSION}")
+ 
+-FIND_PACKAGE(Boost REQUIRED COMPONENTS thread system filesystem ${BOOST_PYTHON_VERSION})
++FIND_PACKAGE(Boost REQUIRED COMPONENTS thread filesystem ${BOOST_PYTHON_VERSION})
++# boost::system is header-only in Boost 1.69+ so we add it separately if needed
++if(NOT TARGET Boost::system)
++  add_library(Boost::system INTERFACE IMPORTED)
++  target_link_libraries(Boost::system INTERFACE Boost::headers)
++endif()
+ include_directories(${Boost_INCLUDE_DIRS})
+ 
+ include_directories(${PROJECT_SOURCE_DIR}/src)
+diff --git a/third_party/gfootball_engine/src/onthepitch/match.cpp b/third_party/gfootball_engine/src/onthepitch/match.cpp
+index 8c41901..9115c8b 100755
+--- a/third_party/gfootball_engine/src/onthepitch/match.cpp
++++ b/third_party/gfootball_engine/src/onthepitch/match.cpp
+@@ -19,6 +19,7 @@
+ 
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ 
+ #include "../base/geometry/triangle.hpp"
+ #include "../base/log.hpp"
+@@ -528,6 +529,37 @@ void Match::UpdateIngameCamera() {
+   if (fabs(ballPos.coords[0]) > maxW) ballPos.coords[0] = maxW * signSide(ballPos.coords[0]);
+   if (fabs(ballPos.coords[1]) > maxH) ballPos.coords[1] = maxH * signSide(ballPos.coords[1]);
+ 
++  // Framing offset (spot-the-ball benchmark). The camera target above is the
++  // ball itself, so the ball renders dead centre in every clip and every grid
++  // answer collapses to the middle cells. Shifting the target by a fixed
++  // per-clip amount reframes the shot -- the camera still pans and tracks
++  // exactly as before, the ball just sits off-centre, the way a real operator
++  // frames play. Applied AFTER the follow clamp above: inside it, maxH
++  // saturates the pan well before the ball reaches the top of frame, which
++  // costs the entire top row of the grid. The wider bound here still keeps the
++  // target on the pitch so the view never drifts into the stands. Read per
++  // frame so the generator can set it per clip; unset means byte-identical
++  // behaviour to the stock camera.
++  {
++    const char *offX = getenv("GFOOTBALL_CAM_OFFSET_X");
++    const char *offY = getenv("GFOOTBALL_CAM_OFFSET_Y");
++    if (offX || offY) {
++      if (offX) ballPos.coords[0] += atof(offX);
++      if (offY) ballPos.coords[1] += atof(offY);
++      // Bound the offset target to the PITCH, not to a multiple of the follow
++      // clamp. maxW is already ~1.65x the pitch half-length, so a multiple of it
++      // lets the camera aim past the goal line or over the touchline and fill a
++      // third of the shot with empty seating. Staying inside the playing surface
++      // is what keeps every reframed clip looking like football.
++      const float framedW = pitchHalfW * 0.95f;
++      const float framedH = pitchHalfH * 0.80f;
++      if (fabs(ballPos.coords[0]) > framedW)
++        ballPos.coords[0] = framedW * signSide(ballPos.coords[0]);
++      if (fabs(ballPos.coords[1]) > framedH)
++        ballPos.coords[1] = framedH * signSide(ballPos.coords[1]);
++    }
++  }
++
+   Vector3 shudder =
+       Vector3(boostrandom(-0.1f, 0.1f), boostrandom(-0.1f, 0.1f), 0) *
+       (ball->GetMovement().GetLength() * 0.8f + 6.0f);
+diff --git a/third_party/gfootball_engine/src/onthepitch/player/humanoid/humanoidbase.cpp b/third_party/gfootball_engine/src/onthepitch/player/humanoid/humanoidbase.cpp
+index fca4d39..d37bf92 100755
+--- a/third_party/gfootball_engine/src/onthepitch/player/humanoid/humanoidbase.cpp
++++ b/third_party/gfootball_engine/src/onthepitch/player/humanoid/humanoidbase.cpp
+@@ -440,7 +440,14 @@ void HumanoidBase::UpdateFullbodyNodes(bool mirror) {
+     joints[i].position = joints[i].node->GetDerivedPosition() - fullbodyOffset;
+   }
+   hairStyle->SetRotation(joints[2].orientation, false);
+-  hairStyle->SetPosition(joints[2].position * zMultiplier + fullbodyOffset, false);
++  if (renderScale != 1.0f) {
++    // Hair is a separate mesh not affected by renderScale (which only shrinks the
++    // body). For tiny (invisible) officials, park the hair off-screen so a full-size
++    // floating head is not left behind above the shrunken body.
++    hairStyle->SetPosition(Vector3(1000, 1000, -1000), false);
++  } else {
++    hairStyle->SetPosition(joints[2].position * zMultiplier + fullbodyOffset, false);
++  }
+   hairStyle->RecursiveUpdateSpatialData(e_SpatialDataType_Both);
+   if (mirror) {
+     DO_VALIDATION;
+@@ -584,9 +591,15 @@ void HumanoidBase::UpdateFullbodyModel(bool updateSrc) {
+                  resultBitangent.coords, 3 * sizeof(float));
+         }
+ 
++        // Shrink the drawn body toward its local origin for tiny (invisible)
++        // officials. Only the render mesh is scaled; the source cache above is
++        // left full-size so successive frames do not compound the shrink.
++        Vector3 renderVertex = (renderScale == 1.0f)
++                                   ? resultVertex
++                                   : (resultVertex * renderScale);
+         memcpy(&materializedTriangleMeshes[subgeom]
+                     .vertices[weightedVertices[v].vertexID * 3],
+-               resultVertex.coords, 3 * sizeof(float));
++               renderVertex.coords, 3 * sizeof(float));
+         memcpy(&materializedTriangleMeshes[subgeom]
+                     .vertices[weightedVertices[v].vertexID * 3 +
+                               uniqueElementOffset],
+diff --git a/third_party/gfootball_engine/src/onthepitch/player/humanoid/humanoidbase.hpp b/third_party/gfootball_engine/src/onthepitch/player/humanoid/humanoidbase.hpp
+index 90ee8f0..c23802a 100755
+--- a/third_party/gfootball_engine/src/onthepitch/player/humanoid/humanoidbase.hpp
++++ b/third_party/gfootball_engine/src/onthepitch/player/humanoid/humanoidbase.hpp
+@@ -275,6 +275,11 @@ class HumanoidBase {
+ 
+     void Hide() { DO_VALIDATION; fullbodyNode->SetPosition(Vector3(1000, 1000, -1000)); hairStyle->SetPosition(Vector3(1000, 1000, -1000)); } // hax ;)
+ 
++    // Uniform shrink applied to the RENDERED body mesh only (source mesh stays
++    // full-size, so it does not compound frame-to-frame). 1.0 = normal size.
++    // Officials are set to a tiny value so the referee/linesmen are invisible.
++    float renderScale = 1.0f;
++
+     void SetKit(boost::intrusive_ptr < Resource<Surface> > newKit);
+ 
+     virtual void ResetSituation(const Vector3 &focusPos);
+diff --git a/third_party/gfootball_engine/src/onthepitch/player/playerofficial.cpp b/third_party/gfootball_engine/src/onthepitch/player/playerofficial.cpp
+index 3b639bb..f7d18b5 100755
+--- a/third_party/gfootball_engine/src/onthepitch/player/playerofficial.cpp
++++ b/third_party/gfootball_engine/src/onthepitch/player/playerofficial.cpp
+@@ -54,6 +54,9 @@ void PlayerOfficial::Activate(boost::intrusive_ptr<Node> humanoidSourceNode,
+       this, match, humanoidSourceNode, fullbodySourceNode, colorCoords,
+       animCollection, match->GetDynamicNode(), kit));
+ 
++  // Shrink the referee/linesmen to 2% so they are not visible to the naked eye.
++  CastHumanoid()->renderScale = 0.02f;
++
+   CastHumanoid()->ResetPosition(Vector3(0), Vector3(0));
+ 
+   controller.reset(new RefereeController(match));
+diff --git a/third_party/gfootball_engine/src/onthepitch/team.cpp b/third_party/gfootball_engine/src/onthepitch/team.cpp
+index 60127c1..5464b31 100755
+--- a/third_party/gfootball_engine/src/onthepitch/team.cpp
++++ b/third_party/gfootball_engine/src/onthepitch/team.cpp
+@@ -18,6 +18,9 @@
+ 
+ #include "team.hpp"
+ 
++#include <cstdlib>
++#include <string>
++
+ #include "../gamedefines.hpp"
+ #include "../main.hpp"
+ #include "../utils.hpp"
+@@ -108,6 +111,25 @@ void Team::InitPlayers(boost::intrusive_ptr<Node> fullbodyNode,
+       player->Activate(
+           playerNode, fullbodyNode,
+           colorCoords, kit, match->GetAnimCollection(), formation.lazy);
++
++      // Research hook: selectively hide players while keeping them fully in the
++      // simulation, by shrinking the RENDERED body to ~invisible (renderScale, the
++      // same mechanism used for referees). Keyed on (team, index-within-team) so the
++      // hidden set is deterministic and matches the scenario's AddPlayer order.
++      // Controlled at runtime by GFOOTBALL_HIDE_SLOTS: a comma list of tokens like
++      // "L1,L2,R3" (L=left team, R=right team, number = index within team). Read live
++      // on each activation (i.e. every env.reset), so the set can change between
++      // render passes within a single process.
++      const char *hideSlots = getenv("GFOOTBALL_HIDE_SLOTS");
++      if (hideSlots && hideSlots[0] != '\0') {
++        DO_VALIDATION;
++        std::string token =
++            std::string(GetID() == 0 ? "L" : "R") + int_to_str(i);
++        std::string haystack = std::string(",") + hideSlots + ",";
++        if (haystack.find("," + token + ",") != std::string::npos) {
++          player->CastHumanoid()->renderScale = 0.02f;
++        }
++      }
+     }
+   }
+ 
