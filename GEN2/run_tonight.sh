@@ -17,6 +17,22 @@
 set -u
 cd "/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2" || exit 1
 
+# ── stay awake ──────────────────────────────────────────────────────────────────
+# `pmset -g custom` reports sleep=1 on both AC and battery, and neither launchd nor a
+# backgrounded shell holds a power assertion. An unattended run would be suspended
+# shortly after the machine went idle. Re-exec once under caffeinate to hold the
+# assertion for exactly the lifetime of this script.
+#
+# Flags are -ims, deliberately NOT -d: idle, disk and system sleep are blocked, but the
+# DISPLAY is still allowed to sleep. The panel is a real power and heat source and
+# nothing in this pipeline needs it lit.
+if [ -z "${GEN2_CAFFEINATED:-}" ]; then
+  export GEN2_CAFFEINATED=1
+  # /bin/bash is named explicitly so this does not depend on the exec bit — launchd
+  # invokes the script as `/bin/bash run_tonight.sh`, so $0 need not be executable.
+  exec /usr/bin/caffeinate -ims /bin/bash "$0" "$@"
+fi
+
 # Absolute interpreter. launchd does NOT inherit the interactive shell's PATH, and the
 # bare name resolves differently there — /usr/bin/python3 is the system one and has no
 # numpy at all. Pin the framework build that actually has numpy and gfootball.
