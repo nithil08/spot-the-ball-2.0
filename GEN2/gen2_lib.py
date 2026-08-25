@@ -143,6 +143,20 @@ def tag(shape, seed):
 
 
 # ── engine passes ───────────────────────────────────────────────────────────────
+# Observation rate = PHYSICS_STEPS_PER_SECOND (100) / PSF, so PSF=10 is 10 fps and
+# PSF=4 is 25 fps. GEN1 and the original GEN2 batch are 10 fps; gen_corners_v2 sets
+# this to 4. Lower PSF means the built-in AI acts more often, so the match plays out
+# DIFFERENTLY — a sweep cached at one PSF cannot be reused at another. Measured on
+# pressL2 s7: identical for ~10 s, then a discrete event flips and it diverges (max
+# ball-track difference 0.51).
+#
+# TRAP: football_env_core keeps a global `_unused_engines` pool and only applies
+# physics_steps_per_frame in _get_new_env(), never on reuse. The FIRST env built in a
+# process therefore fixes PSF for every later env in that process. Set PSF once, at
+# import time, before any env exists — never change it mid-process.
+PSF = 10
+
+
 def _env(level, seed, workdir):
     from gfootball.env import config as cfg, football_env
     workdir.mkdir(parents=True, exist_ok=True)
@@ -151,7 +165,7 @@ def _env(level, seed, workdir):
         "write_video": False, "dump_full_episodes": False, "dump_scores": False,
         "tracesdir": str(workdir), "real_time": False,
         "game_engine_random_seed": seed, "video_quality_level": 2,
-        "display_game_stats": False,
+        "display_game_stats": False, "physics_steps_per_frame": PSF,
     }
     return football_env.FootballEnv(cfg.Config(values))
 
