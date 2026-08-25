@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nithil.cornersv2</string>
+
+    <!-- Rebuilds the 5 corner-kick clips: sweep -> pick -> gate -> build.
+         Every stage checkpoints, so a partial run just continues. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2/run_corners_v2.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>23</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2/_cache/corners_v2/launchd_out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2/_cache/corners_v2/launchd_err.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- Deliberately NOT ProcessType=Background. Background QoS parks the job on the
+         efficiency cores, which is 5x slower here (190 s/match vs 36 s/match). Nobody
+         is using the machine at 23:00, so it gets the performance cores. The script
+         holds its own caffeinate assertion for the duration. -->
+    <key>ProcessType</key>
+    <string>Standard</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>SHARDS</key>
+        <string>4</string>
+        <key>COOL</key>
+        <string>0</string>
+    </dict>
+</dict>
+</plist>
