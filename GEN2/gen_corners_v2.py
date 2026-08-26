@@ -71,6 +71,26 @@ SWEEP_STEPS = 2750          # 110 s of match at 25 fps
 MIN_ONSCREEN = 10           # visible players required in EVERY frame
 MIN_ABS_X = 0.50            # ball stays in the corner's own final third
 N_WANT = 5
+PROBE_EXTRA = 50            # 2.0 s of headroom to slide the window into
+
+# WHY THE WINDOW SLIDES INSTEAD OF STARTING AT THE DELIVERY
+#
+# The first pass sweep (160 matches -> 7 windows) failed the occupancy gate 7/7, and
+# the per-frame trace says why: the empty frames are ALL at the front. Every window
+# opens at 4-7 players and is healthy (11-25) from roughly frame 20 onward. With the
+# delivery at LEAD=10, that sparse run is exactly the ball's flight time — the camera
+# leaves the arc, crosses empty grass, and only fills up when the ball reaches the box.
+#
+# So this is camera geometry on a fixed schedule, not an unlucky draw, and sweeping
+# more matches (the note this file used to print) buys more windows with the same hole
+# in them. Instead the gate renders extra frames and slides the 125-frame clip to the
+# EARLIEST offset whose worst frame clears the floor — earliest so that as much of the
+# delivery as possible survives.
+#
+# The trade: a slid clip opens with the ball already in flight rather than at the strike.
+# It is still a Law 17 corner and still the same play; it just starts a beat later.
+# Every log gate is re-checked at the shifted position (see max_safe_offset) so sliding
+# can never walk the window into a restart or out of the corner's own final third.
 
 OUT = HERE / "02_corner_kicks_v2"
 CACHE = G.CACHE / "corners_v2"
@@ -153,6 +173,34 @@ def no_setpiece_inside(log, s, e):
     return not any(gm[i] in modes and gm[i] != gm[i - 1] for i in range(1, len(gm)))
 
 
+def window_ok(log, s, e, n):
+    """Every log gate, as one predicate, so the slid window is held to the same bar
+    as the anchored one."""
+    if s < 0 or e > n:
+        return False
+    if not continuous(log["ball"][s:e]):
+        return False
+    if not no_setpiece_inside(log, s, e):
+        return False
+    bx = log["ball"][s:e, 0]
+    if np.abs(bx).min() < MIN_ABS_X:
+        return False                       # play left the corner's final third
+    return bool((np.sign(bx) == np.sign(bx[0])).all())   # play switched ends
+
+
+def max_safe_offset(log, s, n, limit=PROBE_EXTRA):
+    """How far the window may slide before a log gate breaks.
+
+    Checked per offset rather than once over the whole probe span: demanding the
+    gates hold across all 175 frames would throw away windows that are perfectly
+    good at some shift, and yield here is only 7 windows per 160 matches.
+    """
+    off = 0
+    while off < limit and window_ok(log, s + off + 1, s + off + 1 + CLIP_FRAMES, n):
+        off += 1
+    return off
+
+
 def cmd_pick(argv):
     """Cheap log-only gates. Everything that survives gets rendered and gated again."""
     import glob
@@ -166,19 +214,11 @@ def cmd_pick(argv):
         for r in find_corners(log):
             s = max(r["anchor"] - LEAD, r["min_start"])
             e = s + CLIP_FRAMES
-            if e > n:
+            if not window_ok(log, s, e, n):
                 continue
-            if not continuous(log["ball"][s:e]):
-                continue
-            if not no_setpiece_inside(log, s, e):
-                continue
-            bx = log["ball"][s:e, 0]
-            if np.abs(bx).min() < MIN_ABS_X:
-                continue                       # play left the corner's final third
-            if not (np.sign(bx) == np.sign(bx[0])).all():
-                continue                       # play switched ends
             rows.append({"shape": shape, "seed": int(seed), "match": t,
-                         "start": int(s), "end": int(e), "apex": r["apex"]})
+                         "start": int(s), "end": int(e), "apex": r["apex"],
+                         "max_off": max_safe_offset(log, s, n)})
     rows.sort(key=lambda r: -r["apex"])
     CACHE.mkdir(parents=True, exist_ok=True)
     SHORTLIST.write_text(json.dumps(rows, indent=1))
@@ -235,6 +275,20 @@ def compose(vis, inv):
 OCCUPANCY = CACHE / "occupancy.json"
 
 
+def slide(counts, areas):
+    """Pick the CLIP_FRAMES-long sub-window with the best worst frame.
+
+    Ties go to the EARLIEST offset, which keeps the clip as close to the delivery as
+    the occupancy floor allows — the point is to skip the camera's empty traverse,
+    not to drift downfield looking for a crowd.
+    """
+    n_off = len(counts) - CLIP_FRAMES + 1
+    if n_off <= 1:
+        return 0, counts[:CLIP_FRAMES], areas[:CLIP_FRAMES]
+    best = max(range(n_off), key=lambda o: (counts[o:o + CLIP_FRAMES].min(), -o))
+    return best, counts[best:best + CLIP_FRAMES], areas[best:best + CLIP_FRAMES]
+
+
 def cmd_gate(argv):
     """Measure on-screen occupancy for every shortlisted window.
 
@@ -256,22 +310,29 @@ def cmd_gate(argv):
             continue                       # one corner per match, for source diversity
         seen.add(r["match"])
         key = f"{r['match']}@{r['start']}"
-        if key in done:
-            continue
+        if key in done and "offset" in done[key]:
+            continue                       # records without a slid offset are redone
         use_bundle(G.BUNDLE_VIS)
         lvl = write_scenario(shape_spec(r["shape"]), force=False)
-        vis, _b = render_window(lvl, r["seed"], r["start"], r["end"])
-        empty, _b = render_window(lvl, r["seed"], r["start"], r["end"],
+        probe_end = r["end"] + r.get("max_off", 0)
+        vis, _b = render_window(lvl, r["seed"], r["start"], probe_end)
+        empty, _b = render_window(lvl, r["seed"], r["start"], probe_end,
                                   hide_slots=",".join(ALL_SLOTS))
         counts, areas = onscreen_counts(vis, empty)
         del vis, empty
+        off, counts, areas = slide(counts, areas)
+        # The per-frame trace is what says whether emptiness is a dodgeable moment
+        # (a contiguous dip at a fixed offset — re-time the window) or intrinsic to
+        # how the camera covers a corner (scattered — only more sweeping helps).
         done[key] = {"min": int(counts.min()), "med": int(np.median(counts)),
                      "p10": int(np.percentile(counts, 10)),
-                     "area_med": int(np.median(areas))}
+                     "area_med": int(np.median(areas)),
+                     "offset": int(off), "per_frame": counts.tolist()}
         OCCUPANCY.write_text(json.dumps(done, indent=1))
         verdict = "PASS" if counts.min() >= MIN_ONSCREEN else "fail"
         print(f"  {verdict} {key}: min on screen {counts.min():2d}, "
-              f"median {int(np.median(counts)):2d}")
+              f"median {int(np.median(counts)):2d}, slid +{off} "
+              f"({off / FPS:.2f} s past the delivery)")
     ok = sum(1 for v in done.values() if v["min"] >= MIN_ONSCREEN)
     print(f"\n{len(done)} measured, {ok} pass the >= {MIN_ONSCREEN} floor "
           f"(need {N_WANT})")
@@ -293,7 +354,10 @@ def cmd_build(argv):
         if key not in occ or r["match"] in seen:
             continue
         seen.add(r["match"])
-        r.update(min_onscreen=occ[key]["min"], med_onscreen=occ[key]["med"])
+        # The measured window is the SLID one, so the clip must be rendered there.
+        off = occ[key].get("offset", 0)
+        r.update(min_onscreen=occ[key]["min"], med_onscreen=occ[key]["med"],
+                 offset=off, start=r["start"] + off, end=r["start"] + off + CLIP_FRAMES)
         cand.append(r)
     cand.sort(key=lambda r: (-r["min_onscreen"], -r["med_onscreen"]))
     kept = [r for r in cand if r["min_onscreen"] >= MIN_ONSCREEN][:N_WANT]
@@ -304,7 +368,9 @@ def cmd_build(argv):
         for r in cand[:8]:
             print(f"   {r['match']} f{r['start']}: min {r['min_onscreen']}, "
                   f"med {r['med_onscreen']}")
-        print("Sweep more matches rather than lowering the floor — the floor is the fix.")
+        print("The windows are already slid to their best offset, so this is a real "
+              "shortage, not the front-of-clip dip. Sweep more seeds (SEEDS in this "
+              "file) rather than lowering the floor — the floor is the fix.")
         return 1
 
     for r in kept:
@@ -322,7 +388,8 @@ def cmd_build(argv):
         w = csv.writer(fh)
         w.writerow(["clip", "shape", "seed", "match", "start_frame", "end_frame",
                     "n_frames", "fps", "seconds", "start_px", "start_py",
-                    "final_px", "final_py", "min_onscreen", "med_onscreen", "apex"])
+                    "final_px", "final_py", "min_onscreen", "med_onscreen", "apex",
+                    "slid_frames"])
         for i, r in enumerate(kept, 1):
             name = f"corner_kick_{i:02d}"
             full, split, (spx, spy), (fpx, fpy) = compose(r["vis"], r["inv"])
@@ -331,7 +398,8 @@ def cmd_build(argv):
             w.writerow([name, r["shape"], r["seed"], r["match"], r["start"], r["end"],
                         CLIP_FRAMES, FPS, round(CLIP_FRAMES / FPS, 2),
                         round(spx, 1), round(spy, 1), round(fpx, 1), round(fpy, 1),
-                        r["min_onscreen"], r["med_onscreen"], r["apex"]])
+                        r["min_onscreen"], r["med_onscreen"], r["apex"],
+                        r.get("offset", 0)])
             print(f"wrote {name}: {CLIP_FRAMES} frames @ {FPS} fps, "
                   f"min on screen {r['min_onscreen']}")
     print(f"\n{len(kept)} clips written to {OUT}")
