@@ -155,7 +155,7 @@ index 3b639bb..f7d18b5 100755
  
    controller.reset(new RefereeController(match));
 diff --git a/third_party/gfootball_engine/src/onthepitch/team.cpp b/third_party/gfootball_engine/src/onthepitch/team.cpp
-index 60127c1..5464b31 100755
+index 60127c1..6ce7648 100755
 --- a/third_party/gfootball_engine/src/onthepitch/team.cpp
 +++ b/third_party/gfootball_engine/src/onthepitch/team.cpp
 @@ -18,6 +18,9 @@
@@ -168,7 +168,32 @@ index 60127c1..5464b31 100755
  #include "../gamedefines.hpp"
  #include "../main.hpp"
  #include "../utils.hpp"
-@@ -108,6 +111,25 @@ void Team::InitPlayers(boost::intrusive_ptr<Node> fullbodyNode,
+@@ -102,12 +105,49 @@ void Team::InitPlayers(boost::intrusive_ptr<Node> fullbodyNode,
+                       int_to_str(GetMenuTask()->GetTeamKitNum(GetID())) +
+                       ".png";
+       } else {
+-        kitFilename = "media/objects/players/textures/goalie_kit.png";
++        // Stock: ONE global goalie texture, so both keepers wear the same kit and a
++        // keeper reads as "a third team" rather than as part of his own side.
++        //
++        // Research hook: with GFOOTBALL_TEAM_GK_KITS set, the keeper's kit is derived
++        // from his own team's kit_url instead, so each side can ship a keeper texture
++        // in its own hue. Opt-in because IMG_LoadBmp dereferences the decoded surface
++        // without a null check — asking for a file a bundle does not carry is a
++        // segfault, and only the bundles built for this benchmark carry the two
++        // "<kit_url>_gk_kit.bmp" files. Unset is byte-identical to stock.
++        //
++        // Note ".png" is the convention throughout this file; IMG_LoadBmp rewrites the
++        // extension to ".bmp" before touching the disk.
++        const char *teamGkKits = getenv("GFOOTBALL_TEAM_GK_KITS");
++        if (teamGkKits && teamGkKits[0] != '\0' && teamGkKits[0] != '0') {
++          DO_VALIDATION;
++          kitFilename = GetTeamData()->GetKitUrl() + "_gk_kit.png";
++        } else {
++          kitFilename = "media/objects/players/textures/goalie_kit.png";
++        }
+       }
+       kit = GetContext().surface_manager.Fetch(kitFilename);
        player->Activate(
            playerNode, fullbodyNode,
            colorCoords, kit, match->GetAnimCollection(), formation.lazy);

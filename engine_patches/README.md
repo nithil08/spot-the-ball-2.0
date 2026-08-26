@@ -15,7 +15,7 @@ these changes. Do not confuse the two.
 | `src/onthepitch/match.cpp` | `GFOOTBALL_CAM_OFFSET_X` / `_Y` — shifts the camera. Note this breaks the grid centre bias; centre bias is camera geometry, not scenario design. |
 | `src/onthepitch/player/humanoid/humanoidbase.{cpp,hpp}` | Adds a `renderScale` on the humanoid base — the mechanism the other two shrink patches drive. |
 | `src/onthepitch/player/playerofficial.cpp` | Officials rendered at `0.02f`, i.e. invisible referees, automatic for every clip. |
-| `src/onthepitch/team.cpp` | `GFOOTBALL_HIDE_SLOTS` — a comma list of slot tokens whose players render at ~0 scale while staying in play. |
+| `src/onthepitch/team.cpp` | `GFOOTBALL_HIDE_SLOTS` — a comma list of slot tokens whose players render at ~0 scale while staying in play. Also `GFOOTBALL_TEAM_GK_KITS` — derives each keeper's kit from his own team's `kit_url` (`<kit_url>_gk_kit.png`) instead of the one global `goalie_kit.png`, so the two keepers can wear their own team's colours. Opt-in: `IMG_LoadBmp` dereferences the decoded surface with no null check, so requesting a texture a bundle does not carry is a segfault. |
 | `CMakeLists.txt` | `boost::system` is header-only in Boost 1.69+; find it separately. Portability fix, not behavioural. |
 | `setup.py` | `makedirs(dest_dir)` before copying the prebuilt lib; `gym>=0.21.0`. Portability fixes. |
 
@@ -44,6 +44,11 @@ check the mechanisms directly:
 - **`GFOOTBALL_HIDE_SLOTS`** — set it and confirm the named players vanish while the match
   still plays out identically (ball trajectory unchanged).
 - **Camera offset** — set `GFOOTBALL_CAM_OFFSET_X` and confirm the frame shifts.
+- **Per-team keeper kits** — with `GFOOTBALL_TEAM_GK_KITS=1` and a `gen3` bundle, the two
+  keepers must render in different colours. Measure rather than eyeball: hide all 22
+  players for a plate, then show exactly one keeper and diff — the changed pixels are
+  that keeper, and their mean colour is the kit. Expect roughly RGB (134,188,241) for the
+  blue team's keeper and (230,137,134) for the red team's.
 
 ## Regenerating the patch after further engine edits
 
