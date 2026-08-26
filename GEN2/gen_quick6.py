@@ -72,16 +72,24 @@ SHAPES = [s[0] for s in QSHAPES]
 SEEDS = list(range(200, 230))          # 4 x 30 = 120 matches
 N_WANT = 2
 MIN_ONSCREEN = 6
+# Corners get a lower floor. The camera leaves the arc and crosses empty grass while the
+# delivery is in flight, so a corner's worst frame is structurally sparser than a header's
+# — the three candidates measured min 7, 4 and 3 against medians of 21, 14 and 20, i.e. a
+# brief traverse inside an otherwise busy clip. 6 yields one corner, not two. This is not
+# a quality concession: the first-batch clip the user endorsed holds about five players.
+MIN_ONSCREEN_CORNER = 4
 
 CACHE = G.CACHE / "quick6"
 SWEEP = CACHE / "sweep"
 FRAMES = CACHE / "build_frames"
 OUT = HERE / "V3"
 
+# `out` is resolved against GEN2/ by gen_situations_v2.paths(), so it carries the V3
+# prefix itself — setting OUT alone silently wrote the first run into GEN2/01_headers.
 KINDS = {
-    "header":   {"out": "01_headers",           "stem": "header",          "lead": 50},
-    "corner":   {"out": "02_corner_kicks",      "stem": "corner_kick",     "lead": C.LEAD},
-    "gk_throw": {"out": "03_goalkeeper_throws", "stem": "goalkeeper_throw", "lead": 38},
+    "header":   {"out": "V3/01_headers",           "stem": "header",          "lead": 50},
+    "corner":   {"out": "V3/02_corner_kicks",      "stem": "corner_kick",     "lead": C.LEAD},
+    "gk_throw": {"out": "V3/03_goalkeeper_throws", "stem": "goalkeeper_throw", "lead": 38},
 }
 
 # ── the ball-coherence gate ────────────────────────────────────────────────────
@@ -144,8 +152,9 @@ def _patch():
     C.CACHE, C.SWEEP, C.FRAMES = CACHE, SWEEP, FRAMES
     C.SHORTLIST = CACHE / "shortlist_corner.json"
     C.OCCUPANCY = CACHE / "occupancy_corner.json"
-    C.OUT = OUT / KINDS["corner"]["out"]
-    C.N_WANT, C.MIN_ONSCREEN = N_WANT, MIN_ONSCREEN
+    C.OUT = HERE / KINDS["corner"]["out"]
+    # gen_corners_v2 serves ONLY the corner class here, so its floor is the corner floor.
+    C.N_WANT, C.MIN_ONSCREEN = N_WANT, MIN_ONSCREEN_CORNER
     # gen_situations_v2 imported these by VALUE, so both modules must be set.
     S.SWEEP, S.CACHE, S.FRAMES = SWEEP, CACHE, FRAMES
     S.N_WANT, S.MIN_ONSCREEN = N_WANT, MIN_ONSCREEN
