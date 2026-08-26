@@ -12,7 +12,8 @@
 # The probe is run ONE MATCH PER PROCESS on purpose. The engine leaks resources and a
 # process dies at roughly its 46th FootballEnv, which is two matches' worth of passes —
 # observed as four independent shards each completing exactly 2 matches and dying with no
-# traceback. `probe_one` exits 1 when its shard is empty, so each while-loop ends by itself.
+# traceback. `probe_one` exits 3 when its shard is empty; any other non-zero is the leak, and is
+# retried. Using 1 for "empty" was a real bug — indistinguishable from a crash.
 
 set -u
 cd "/Users/nithilbalamurugan/Desktop/Nithil Research/spot-the-ball-2.0/GEN2" || exit 1
@@ -106,7 +107,7 @@ for i in $(seq 0 $((SHARDS - 1))); do
   ) &
 done
 wait
-echo "probe finished: $(ls _cache/player_delta/counts 2>/dev/null | wc -l | tr -d ' ') maps"
+echo "probe finished: $(ls _cache/player_delta/counts_psf4 2>/dev/null | wc -l | tr -d ' ') maps"
 
 # ── 2. pick windows, then render and compose ─────────────────────────────────────
 step "pick"

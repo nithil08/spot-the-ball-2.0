@@ -25,18 +25,29 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from gen2_lib import ALL_SLOTS, CACHE, CLIP_FRAMES, FPS, HERE
+from gen2_lib import ALL_SLOTS, CACHE, HERE
 
-# Situations per class. The three match-situation classes are 10 each (the batch was cut
-# from 20 to 10 on request); player-delta stays at 20, because it has to cover four
-# separate end-counts at 5 apiece. Each situation ships in BOTH visibility variants, so
-# the clip count per class is twice the number here.
-WANT_PER_CLASS = {
-    "01_headers": 10,
-    "02_corner_kicks": 10,
-    "03_goalkeeper_throws": 10,
-    "04_player_delta": 20,
-}
+# ── which generation is being checked ──────────────────────────────────────────
+# v2 is 25 fps (PSF=4) and 125 frames; v1 was 10 fps and 50. The frame count and the
+# folder names move together, so they are selected together rather than left as two
+# constants that can silently disagree. `python3 verify_batch.py v1` checks the old set.
+GEN = (sys.argv[1] if len(sys.argv) > 1 else "v2").lower()
+if GEN == "v2":
+    CLIP_FRAMES, FPS = 125, 25
+    WANT_PER_CLASS = {
+        "01_headers_v2": 10,
+        "02_corner_kicks_v2": 5,        # corners yield ~7 windows per 160 matches
+        "03_goalkeeper_throws_v2": 10,
+        "04_player_delta": 20,
+    }
+else:
+    CLIP_FRAMES, FPS = 50, 10
+    WANT_PER_CLASS = {
+        "01_headers": 10,
+        "02_corner_kicks": 10,
+        "03_goalkeeper_throws": 10,
+        "04_player_delta": 20,
+    }
 CLASSES = list(WANT_PER_CLASS)
 VARIANTS = ["full_visibility", "split_1s_4s"]
 END_COUNTS = {6: 5, 10: 5, 12: 5, 16: 5}

@@ -312,17 +312,23 @@ def slide(counts, areas, has_ball=None):
     occupancy floor allows — the point is to skip the camera's empty traverse, not to
     drift downfield looking for a crowd.
 
-    THE BALL CONSTRAINT IS ABSOLUTE, NOT A PREFERENCE. Sliding chases players, and the
-    camera can settle on a crowd while the ball is still out of shot — which is how the
-    first build died: detect_ball got an all-zero difference and divided by zero. A clip
-    whose final frame has no ball on screen has no answer on the grid, so any offset
-    with a ball-less frame is not a worse candidate, it is not a candidate.
+    THE BALL IS REQUIRED AT THE TWO ENDS, AND ONLY THERE. Those are the frames ground
+    truth is measured on: the red start-circle is drawn on the first, and the final cell
+    — the answer — is read off the last. detect_ball divides by the difference mass, so
+    an absent ball there is fatal, which is how the first build died.
 
-    Returns (offset, counts, areas) or (None, ...) when no offset keeps the ball.
+    Interior frames are deliberately NOT required to hold the ball. The visible and
+    invisible renders are identical wherever a player stands in front of the ball, so an
+    occluded ball measures as absent — and requiring every frame threw out three of five
+    corners that held the ball on 161-167 of 175 frames. That is a ball going behind a
+    body for half a second, which is just football; the split variant hides it for four
+    seconds on purpose anyway.
+
+    Returns (offset, counts, areas) or (None, ...) when no offset works.
     """
     n_off = len(counts) - CLIP_FRAMES + 1
     legal = [o for o in range(max(n_off, 1))
-             if has_ball is None or has_ball[o:o + CLIP_FRAMES].all()]
+             if has_ball is None or (has_ball[o] and has_ball[o + CLIP_FRAMES - 1])]
     if not legal:
         return None, counts[:CLIP_FRAMES], areas[:CLIP_FRAMES]
     best = max(legal, key=lambda o: (counts[o:o + CLIP_FRAMES].min(), -o))
