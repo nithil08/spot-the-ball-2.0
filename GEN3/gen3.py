@@ -1,0 +1,547 @@
+"""gen3.py — the GEN3 pilot batch, end to end.
+
+    python3 gen3.py sweep    [--shard i/n]   # log-only match sweep, resumable
+    python3 gen3.py shortlist                # detect situations, apply coherence gates
+    python3 gen3.py natural  [--shard i/n]   # ball pixel at offset 0, per match
+    python3 gen3.py plan                     # assign target cells -> per-match offset
+    python3 gen3.py probe    [--shard i/n]   # EXACT player counts at that offset
+    python3 gen3.py select                   # the joint assignment -> 24 picks
+    python3 gen3.py render   [--shard i/n]   # vis + inv renders of the picks
+    python3 gen3.py compose                  # clips + ground truth
+    python3 gen3.py verify                   # spec checks + contact sheets
+
+WHY THE PHASES ARE SPLIT THIS WAY
+  An asset bundle is chosen by an env var read at gfootball import time, so the visible
+  and invisible renders can never share a process. And the engine leaks: a process dies
+  at roughly its 46th FootballEnv, with no traceback (four independent shards each
+  completed exactly 2 matches of a 23-env probe and died). So every engine phase does a
+  BOUNDED amount of work and exits, and a shell loop re-invokes it. Exit codes carry the
+  distinction the loop needs:
+
+      0            did some work, call me again
+      EXIT_DONE(3) this shard has nothing left, stop looping
+      anything else — including being killed outright — the process DIED, retry it
+
+  Using 1 for "nothing left" was a real bug once: it is indistinguishable from a crash, so
+  every shard stopped after its first match while reporting success.
+
+ORDER OF THE HARD CONSTRAINTS
+  The count is the least controllable quantity, so everything is arranged to give the
+  count the most freedom at the end. Each match gets ONE camera offset (chosen for its
+  ball cell), one 23-pass probe, and then the count is picked by SLIDING the window inside
+  that match — because the probe returns the count for every frame at no extra cost.
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import numpy as np
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+import gen3_lib as G                                                  # noqa: E402
+
+EXIT_DONE = 3
+
+SEEDS = list(range(300, 350))          # 50 seeds x 14 shapes = 700 matches
+SWEEP_STEPS = 2750                     # ~110 s of match, matching the GEN2 sweep length
+
+# Windows may not open in the first second of a shape that is not a kick-off: the players
+# are still accelerating out of their scenario placement and it does not read as live play.
+# Kick-off windows are exempt by construction — that IS the restart.
+SKIP_START = 25
+SLIDE = {"corner": 30, "kickoff": 30, "gk_throw": 30, "open": 10_000}
+STRIDE = 5
+
+CAND = G.CACHE / "shortlist.json"
+NATURAL = G.CACHE / "natural"
+PLAN = G.CACHE / "plan.json"
+COUNTS = G.CACHE / "counts"
+PICKS = G.CACHE / "picks.json"
+RENDERS = G.CACHE / "renders"
+
+# ── camera calibration (measured; see data/code/gen_30_spread_code.py) ──────────
+KX = -26.58                 # px per world unit of offset X, linear over the whole range
+CROSS_YX = -2.92            # px of X shift per unit of offset Y (perspective)
+OFFY_TABLE = [-20, -16, -14, -10, -6, -3, 0, 3, 6, 9, 12]
+DPY_TABLE = [-228.3, -188.7, -168.0, -124.2, -77.3, -39.8, 0.0, 42.2, 87.4, 135.7, 187.0]
+OFFX_RANGE, OFFY_RANGE = (-26.0, 26.0), (-12.0, 12.0)
+SAFE_PX, SAFE_PY = (55.0, 1225.0), (35.0, 445.0)
+# Engine-side bounds on the framing target (match.cpp) and the obs->world scales. The
+# linear calibration holds only while the target stays INSIDE these: once the clamp bites,
+# the engine's yaw term couples the axes and the ball lands nowhere near the solve.
+FRAMED_W, FRAMED_H = 55.0 * 0.95, 36.0 * 0.80
+X_FIELD_SCALE, Y_FIELD_SCALE = 54.4, -83.6
+CLAMP_MARGIN = 0.88
+
+DOWN = 2                    # the probe renders at half size; a body is still tens of px
+MIN_PIX = 40                # changed (half-size) pixels before a player counts as in frame
+
+
+def parse_shard(argv):
+    for i, a in enumerate(argv):
+        if a.startswith("--shard"):
+            spec = a.split("=", 1)[1] if "=" in a else argv[i + 1]
+            n, d = spec.split("/")
+            return int(n), int(d)
+    return 0, 1
+
+
+def solve_offsets(px0, py0, tgt_px, tgt_py, world=None):
+    """Camera offset that moves the ball from its natural pixel to the target pixel.
+
+    `world` is the ball's (x, y) in world units at the final frame; it limits the offset so
+    the framing target stays inside the engine's clamp envelope and the linear calibration
+    stays valid. A clip whose ball already sits near a pitch end therefore gets a SMALLER
+    offset rather than a wrong one.
+    """
+    tgt_px = float(np.clip(tgt_px, *SAFE_PX))
+    tgt_py = float(np.clip(tgt_py, *SAFE_PY))
+    offy = float(np.clip(np.interp(tgt_py - py0, DPY_TABLE, OFFY_TABLE), *OFFY_RANGE))
+    offx = float(np.clip((tgt_px - px0 - CROSS_YX * offy) / KX, *OFFX_RANGE))
+    if world is not None:
+        wx, wy = world
+        lx, ly = FRAMED_W * CLAMP_MARGIN, FRAMED_H * CLAMP_MARGIN
+        offx = float(np.clip(offx, -lx - wx, lx - wx))
+        offy = float(np.clip(offy, -ly - wy, ly - wy))
+    return round(offx, 3), round(offy, 3)
+
+
+def cell_centre(r, c):
+    return (c + 0.5) * G.CELL_W, (r + 0.5) * G.CELL_H
+
+
+def cell_of(px, py):
+    c = min(max(int(px // G.CELL_W), 0), G.COLS - 1)
+    r = min(max(int(py // G.CELL_H), 0), G.ROWS - 1)
+    return f"{chr(ord('A') + r)}{c + 1}"
+
+
+# ══ phase 1: sweep ══════════════════════════════════════════════════════════════
+def jobs():
+    return list(G.sweep_jobs(SEEDS))
+
+
+def _todo(shard_i, shard_n, done_dir, suffix=".npz"):
+    return [(sh, sd) for k, (sh, sd) in enumerate(jobs())
+            if k % shard_n == shard_i
+            and not (done_dir / f"{G.tag(sh, sd)}{suffix}").exists()]
+
+
+PER_PROCESS = 15            # well inside the ~46-env leak, one env per sweep match
+
+
+def cmd_sweep(argv):
+    from lib import use_bundle
+    from scenario_factory import write_scenario
+    shard_i, shard_n = parse_shard(argv)
+    use_bundle(G.BUNDLE_VIS)
+    G.SWEEP.mkdir(parents=True, exist_ok=True)
+    for name, *_ in G.SHAPES:
+        write_scenario(G.shape_spec(name), force=(shard_i == 0))
+    todo = _todo(shard_i, shard_n, G.SWEEP)
+    if not todo:
+        print(f"shard {shard_i}/{shard_n}: sweep complete")
+        return EXIT_DONE
+    print(f"shard {shard_i}/{shard_n}: {len(todo)} matches left", flush=True)
+    for shape, seed in todo[:PER_PROCESS]:
+        log = G.run_log(f"g3_{shape}", seed, SWEEP_STEPS)
+        np.savez_compressed(G.SWEEP / f"{G.tag(shape, seed)}.npz", **log)
+        print(f"  [sweep] {G.tag(shape, seed)}: {len(log['ball'])} frames, "
+              f"score {log['score'][-1].tolist()}", flush=True)
+    return 0
+
+
+# ══ phase 2: shortlist ══════════════════════════════════════════════════════════
+def window_ok(log, kind, s, e, n):
+    if s < 0 or e > n:
+        return False
+    if kind != "kickoff" and s < SKIP_START:
+        return False
+    return G.continuous(log["ball"][s:e]) and G.no_setpiece_inside(log, s, e)
+
+
+def _candidates(log, kind, n):
+    """Every legal (start, slide) for one class in one match, with its coherence."""
+    out = []
+    if kind == "open":
+        anchors = [{"anchor": s + G.LEAD.get("open", 0), "min_start": s, "award": s}
+                   for s in range(SKIP_START, n - G.CLIP_FRAMES, STRIDE)]
+    else:
+        anchors = G.DETECTORS[kind](log)
+    for r in anchors:
+        base = max(r["anchor"] - G.LEAD.get(kind, 0), r["min_start"])
+        # Sliding the window later keeps the situation on screen while changing which
+        # frame is the LAST one — which is the frame the count is measured on. For a
+        # restart the slide is capped so the delivery stays inside the opening second;
+        # open play has nothing to stay near, so it slides freely.
+        offsets = [0] if kind == "open" else range(0, SLIDE[kind] + 1, STRIDE)
+        for off in offsets:
+            s = base + off
+            e = s + G.CLIP_FRAMES
+            if not window_ok(log, kind, s, e, n):
+                continue
+            c = G.coherence(log, s, e)
+            if not G.engaged(kind, c):
+                continue
+            out.append({"start": int(s), "end": int(e), "anchor": int(r["anchor"]),
+                        "coh": round(G.coherence_score(c), 4),
+                        **{k: round(v, 3) for k, v in c.items()}})
+    return out
+
+
+MAX_WINDOWS, MIN_SEP = 40, 25
+
+
+def _spread(cands):
+    """The best windows by coherence, but forced apart in TIME.
+
+    Taking the top 40 outright would cluster them on one passage of play, and every window
+    in a cluster ends on nearly the same frame — so they would all measure nearly the same
+    player count, which is precisely the freedom this list exists to provide. Requiring
+    MIN_SEP frames between kept windows buys a spread of end frames, and therefore a
+    spread of counts, at a negligible cost in coherence.
+    """
+    kept = []
+    for c in sorted(cands, key=lambda r: r["coh"]):
+        if all(abs(c["start"] - k["start"]) >= MIN_SEP for k in kept):
+            kept.append(c)
+        if len(kept) >= MAX_WINDOWS:
+            break
+    return kept
+
+
+# Scarcity order: a match that can supply a corner is spent on the corner, because corners
+# are ~0.03 per match while open play is ~47. Assigning the other way round would burn the
+# rare matches on the abundant class.
+CLASS_ORDER = ["corner", "gk_throw", "kickoff", "open"]
+
+
+def cmd_shortlist(argv):
+    import glob
+    rows = []
+    files = sorted(glob.glob(str(G.SWEEP / "*.npz")))
+    tally = {k: 0 for k in CLASS_ORDER}
+    for p in files:
+        t = Path(p).stem
+        shape, seed = t.rsplit("_s", 1)
+        d = np.load(p)
+        log = {k: d[k] for k in d.files}
+        n = len(log["ball"])
+        for kind in CLASS_ORDER:
+            cands = _candidates(log, kind, n)
+            if not cands:
+                continue
+            rows.append({"match": t, "shape": shape, "seed": int(seed), "kind": kind,
+                         "windows": _spread(cands)})
+            tally[kind] += 1
+            break                      # one class per match, scarcity-first
+    G.CACHE.mkdir(parents=True, exist_ok=True)
+    CAND.write_text(json.dumps(rows, indent=1))
+    print(f"shortlist over {len(files)} matches -> {len(rows)} usable matches")
+    for k in CLASS_ORDER:
+        print(f"  {k:<9} {tally[k]:>4} matches")
+    return 0
+
+
+# ══ phase 3: plan — which matches to probe, and at what camera offset ═══════════
+# One offset per MATCH, drawn from a schedule that spans the reachable framing space.
+#
+# Why a schedule instead of solving each offset for a chosen target cell: the solve needs
+# the ball's natural pixel at the window's final frame, which needs a rendered
+# visible/invisible pair BEFORE the probe — a whole extra two-process stage over hundreds
+# of matches. The probe already yields the exact ball pixel for free (see cmd_ballpix), so
+# it is cheaper to fix the offset first, measure what cell it actually produced, and let
+# SELECTION do the spreading across a large candidate pool.
+#
+# Row A is barely reachable and is not chased: putting the ball in the top row means aiming
+# the camera from beyond the near touchline, which fills the bottom of the shot with
+# hoardings and seating. The framing audit in cmd_verify enforces that independently.
+OFFX_SCHEDULE = [0.0, -12.0, 12.0, -20.0, 20.0, -6.0, 6.0, -24.0, 24.0, -16.0, 16.0]
+OFFY_SCHEDULE = [0.0, 6.0, -5.0, 10.0, -9.0, 3.0, -2.0, 8.0, -7.0]
+
+# How many matches to probe per class. The probe is 23 replays per match — by far the most
+# expensive stage — so the budget goes where the scarcity is. Corners run ~0.03 per match,
+# so every corner match the sweep found gets probed; open play runs ~47 per match and is
+# never the binding constraint.
+PROBE_BUDGET = {"corner": 999, "gk_throw": 18, "kickoff": 16, "open": 26}
+MAX_END = 1900             # cap the probe replay length; cost is linear in the end frame
+
+
+def cmd_plan(argv):
+    rows = json.loads(CAND.read_text())
+    by_kind = {k: [] for k in CLASS_ORDER}
+    for r in rows:
+        w = [x for x in r["windows"] if x["end"] <= MAX_END]
+        if not w:
+            continue
+        by_kind[r["kind"]].append({**r, "windows": w})
+    plan, k = [], 0
+    for kind in CLASS_ORDER:
+        # Best-coherence matches first, but spread across shapes and seeds so the batch
+        # does not come from one corner of the scenario space.
+        cands = sorted(by_kind[kind], key=lambda r: r["windows"][0]["coh"])
+        for r in cands[:PROBE_BUDGET[kind]]:
+            plan.append({"match": r["match"], "shape": r["shape"], "seed": r["seed"],
+                         "kind": kind,
+                         "offset_x": OFFX_SCHEDULE[k % len(OFFX_SCHEDULE)],
+                         "offset_y": OFFY_SCHEDULE[k % len(OFFY_SCHEDULE)],
+                         "windows": r["windows"]})
+            k += 1
+    PLAN.write_text(json.dumps(plan, indent=1))
+    got = {kind: sum(1 for p in plan if p["kind"] == kind) for kind in CLASS_ORDER}
+    print(f"plan: {len(plan)} matches to probe  {got}")
+    short = {kind: G.SITUATION_QUOTA[kind] for kind in CLASS_ORDER
+             if got[kind] < G.SITUATION_QUOTA[kind]}
+    if short:
+        print(f"  *** only {got} matches available against a quota of "
+              f"{G.SITUATION_QUOTA} — sweep more seeds for {list(short)}")
+    return 0
+
+
+# ══ phase 4: probe — the exact player count, at the offset that ships ═══════════
+def _planned(shard_i, shard_n, done_dir, suffix=".npz"):
+    plan = json.loads(PLAN.read_text())
+    return [p for i, p in enumerate(plan)
+            if i % shard_n == shard_i
+            and not (done_dir / f"{p['match']}{suffix}").exists()]
+
+
+PLATES = G.CACHE / "plates"
+
+
+def probe_match(p):
+    """Exact per-frame, per-player in-frame map for one match at its shipping offset.
+
+    Render a plate with all 22 players hidden, then 22 more passes each showing exactly
+    one player, and diff. A non-trivial pixel difference means that player's body is
+    inside the camera frustum on that frame. Hiding is render-only, so all 23 passes
+    replay the identical match and the measurement cannot perturb what it measures.
+
+    The plate frames at the candidate end frames are kept for cmd_ballpix, which needs
+    them to locate the ball. They are deleted as soon as that runs.
+    """
+    off = (p["offset_x"], p["offset_y"])
+    end = max(w["end"] for w in p["windows"])
+    lvl = f"g3_{p['shape']}"
+    plate, _ = G.render_window(lvl, p["seed"], 0, end,
+                               hide_slots=",".join(G.ALL_SLOTS), offset=off)
+    plate = np.array(plate, dtype=np.int16)
+    small = plate[:, ::DOWN, ::DOWN]
+    on = np.zeros((len(G.ALL_SLOTS), len(plate)), dtype=bool)
+    for si, slot in enumerate(G.ALL_SLOTS):
+        hide = ",".join(s for s in G.ALL_SLOTS if s != slot)          # show ONLY this one
+        solo, _ = G.render_window(lvl, p["seed"], 0, end, hide_slots=hide, offset=off)
+        solo = np.array(solo, dtype=np.int16)[:, ::DOWN, ::DOWN]
+        d = np.abs(solo - small).sum(axis=3)
+        on[si] = (d > 30).reshape(len(small), -1).sum(axis=1) > MIN_PIX
+    COUNTS.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(COUNTS / f"{p['match']}.npz", on=on)
+    # Only the candidate end frames are needed by the ball-pixel pass; keeping the whole
+    # plate would be ~1.3 GB per match.
+    ends = sorted({w["end"] - 1 for w in p["windows"]})
+    PLATES.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(PLATES / f"{p['match']}.npz",
+                        frames=plate[ends].astype(np.uint8), ends=np.array(ends))
+    tot = on.sum(axis=0)
+    at_ends = [int(on[:, e].sum()) for e in ends]
+    print(f"  [probe] {p['match']} off=({off[0]:+.0f},{off[1]:+.0f}) "
+          f"in-frame {int(tot.min())}-{int(tot.max())}, "
+          f"end counts {sorted(set(at_ends))}", flush=True)
+
+
+def cmd_probe(argv):
+    from lib import use_bundle
+    from scenario_factory import write_scenario
+    shard_i, shard_n = parse_shard(argv)
+    use_bundle(G.BUNDLE_VIS)
+    for name, *_ in G.SHAPES:
+        write_scenario(G.shape_spec(name), force=False)
+    todo = _planned(shard_i, shard_n, COUNTS)
+    if not todo:
+        print(f"shard {shard_i}/{shard_n}: probe complete")
+        return EXIT_DONE
+    print(f"shard {shard_i}/{shard_n}: {len(todo)} matches left", flush=True)
+    probe_match(todo[0])            # ONE match per process: 23 envs, and it dies at ~46
+    return 0
+
+
+# ══ phase 5: ballpix — where the ball actually is, at that same offset ══════════
+def cmd_ballpix(argv):
+    """Ball pixel at every candidate end frame, from the plate pair.
+
+    The plate has all 22 players hidden, so between a visible-ball plate and an
+    invisible-ball plate the ONLY thing that differs is the ball — no shirts, no socks,
+    nothing else that could be mistaken for it. That makes this the cleanest ball
+    detection in the pipeline, and it costs one extra replay on top of the probe's 23.
+
+    Ground truth is still re-measured from the real shipped render in cmd_compose; this
+    exists so SELECTION can see each candidate's grid cell before committing.
+    """
+    from grid import detect_ball
+    from lib import use_bundle
+    from scenario_factory import write_scenario
+    shard_i, shard_n = parse_shard(argv)
+    use_bundle(G.BUNDLE_INV)
+    for name, *_ in G.SHAPES:
+        write_scenario(G.shape_spec(name), force=False)
+    PIX = G.CACHE / "ballpix"
+    PIX.mkdir(parents=True, exist_ok=True)
+    todo = [p for p in _planned(shard_i, shard_n, PIX, ".json")
+            if (PLATES / f"{p['match']}.npz").exists()]
+    if not todo:
+        print(f"shard {shard_i}/{shard_n}: ballpix complete")
+        return EXIT_DONE
+    p = todo[0]
+    off = (p["offset_x"], p["offset_y"])
+    z = np.load(PLATES / f"{p['match']}.npz")
+    vis_plate, ends = z["frames"], list(map(int, z["ends"]))
+    inv, _ = G.render_window(f"g3_{p['shape']}", p["seed"], 0, max(ends) + 1,
+                             hide_slots=",".join(G.ALL_SLOTS), offset=off)
+    out = {}
+    for i, e in enumerate(ends):
+        px, py = detect_ball(vis_plate[i], np.asarray(inv[e]))
+        out[str(e)] = [round(float(px), 1), round(float(py), 1)]
+    (PIX / f"{p['match']}.json").write_text(json.dumps(out))
+    (PLATES / f"{p['match']}.npz").unlink()
+    print(f"  [ballpix] {p['match']}: {len(out)} end frames, cells "
+          f"{sorted({cell_of(*v) for v in out.values()})}", flush=True)
+    return 0
+
+
+# ══ phase 6: select — the joint assignment ═════════════════════════════════════
+def _pool():
+    """Every probed candidate window, with its EXACT end count and measured ball cell."""
+    import gen3_assign                                                # noqa: F401
+    plan = json.loads(PLAN.read_text())
+    PIX = G.CACHE / "ballpix"
+    pool, skipped = [], 0
+    for p in plan:
+        cf, pf = COUNTS / f"{p['match']}.npz", PIX / f"{p['match']}.json"
+        if not (cf.exists() and pf.exists()):
+            skipped += 1
+            continue
+        on = np.load(cf)["on"]
+        pix = json.loads(pf.read_text())
+        for w in p["windows"]:
+            e = w["end"] - 1
+            if e >= on.shape[1] or str(e) not in pix:
+                continue
+            px, py = pix[str(e)]
+            pool.append({"match": p["match"], "shape": p["shape"], "seed": p["seed"],
+                         "kind": p["kind"], "offset_x": p["offset_x"],
+                         "offset_y": p["offset_y"], "start": w["start"], "end": w["end"],
+                         "anchor": w["anchor"], "coh": w["coh"],
+                         "loose": w["loose"], "apex": w["apex"], "dnear": w["dnear"],
+                         "path": w["path"],
+                         "count": int(on[:, e].sum()),
+                         "px": px, "py": py, "cell": cell_of(px, py)})
+    return pool, skipped
+
+
+def cmd_select(argv):
+    import gen3_assign
+    pool, skipped = _pool()
+    print(f"pool: {len(pool)} probed windows ({skipped} planned matches not yet probed)")
+    hist = {}
+    for c in pool:
+        hist.setdefault(c["kind"], set()).add(c["match"])
+    print("  matches per class:", {k: len(v) for k, v in sorted(hist.items())})
+    avail = {n: len({c['match'] for c in pool if c['count'] == n}) for n in G.END_COUNTS}
+    print("  matches per count:", avail)
+
+    picks, report = gen3_assign.solve(pool, G.END_COUNTS, G.PER_COUNT, G.SITUATION_QUOTA)
+    if not picks:
+        print("\nINFEASIBLE:")
+        print(json.dumps(report, indent=2))
+        return 1
+    picks.sort(key=lambda c: (c["count"], c["kind"]))
+    for i, c in enumerate(picks):
+        c["clip"] = f"clip_{i + 1:02d}"
+    PICKS.write_text(json.dumps(picks, indent=2))
+    print(f"\n{'clip':<8}{'count':>6} {'class':<9}{'cell':>5} {'coh':>6}  match")
+    for c in picks:
+        print(f"{c['clip']:<8}{c['count']:>6} {c['kind']:<9}{c['cell']:>5} "
+              f"{c['coh']:>6.2f}  {c['match']}")
+    return 0
+
+
+# ══ phase 7: render — vis and inv, nobody hidden ═══════════════════════════════
+def _render(bundle, tag_, shard_i, shard_n):
+    from lib import use_bundle
+    from scenario_factory import write_scenario
+    use_bundle(bundle)
+    for name, *_ in G.SHAPES:
+        write_scenario(G.shape_spec(name), force=False)
+    picks = json.loads(PICKS.read_text())
+    RENDERS.mkdir(parents=True, exist_ok=True)
+    todo = [p for i, p in enumerate(picks)
+            if i % shard_n == shard_i
+            and not (RENDERS / f"{p['clip']}_{tag_}.npz").exists()]
+    if not todo:
+        return EXIT_DONE
+    for p in todo[:4]:
+        # hide_slots deliberately empty: all 22 players render in every shipped frame.
+        frames, _ = G.render_window(f"g3_{p['shape']}", p["seed"], p["start"], p["end"],
+                                    hide_slots="",
+                                    offset=(p["offset_x"], p["offset_y"]))
+        np.savez_compressed(RENDERS / f"{p['clip']}_{tag_}.npz",
+                            frames=np.array(frames, dtype=np.uint8))
+        print(f"  [{tag_}] {p['clip']} {p['match']} ({len(frames)} frames)", flush=True)
+    return 0
+
+
+def cmd_render_vis(argv):
+    return _render(G.BUNDLE_VIS, "vis", *parse_shard(argv))
+
+
+def cmd_render_inv(argv):
+    return _render(G.BUNDLE_INV, "inv", *parse_shard(argv))
+
+
+# ══ phase 8: compose ═══════════════════════════════════════════════════════════
+HEADER = ("clip,situation,players_in_frame_last,players_in_play,players_hidden,"
+          "ball_final_cell,final_px,final_py,ball_start_cell,start_px,start_py,"
+          "offset_x,offset_y,shape,seed,match,start_frame,end_frame,n_frames,seconds,"
+          "loose,apex,dnear,ball_path,coherence")
+
+
+def cmd_compose(argv):
+    picks = json.loads(PICKS.read_text())
+    rows = [HEADER]
+    G.OUT.mkdir(parents=True, exist_ok=True)
+    for p in picks:
+        vis = np.load(RENDERS / f"{p['clip']}_vis.npz")["frames"]
+        inv = np.load(RENDERS / f"{p['clip']}_inv.npz")["frames"]
+        full, split, (spx, spy), (fpx, fpy) = G.compose_pair(vis, inv)
+        G.write_clip(full, G.OUT / "full_visibility" / f"{p['clip']}.mov")
+        G.write_clip(split, G.OUT / "split_1s_4s" / f"{p['clip']}.mov")
+        p["final_cell_measured"] = G.cell_of(fpx, fpy)
+        rows.append(",".join(map(str, [
+            p["clip"], p["kind"], p["count"], 22, 0,
+            G.cell_of(fpx, fpy), round(fpx, 1), round(fpy, 1),
+            G.cell_of(spx, spy), round(spx, 1), round(spy, 1),
+            p["offset_x"], p["offset_y"], p["shape"], p["seed"], p["match"],
+            p["start"], p["end"], len(full), round(len(full) / G.FPS, 2),
+            p["loose"], p["apex"], p["dnear"], p["path"], p["coh"]])))
+        print(f"  [compose] {p['clip']}: {p['count']} players, {p['kind']}, "
+              f"ball {G.cell_of(spx, spy)} -> {G.cell_of(fpx, fpy)}", flush=True)
+    (G.OUT / "ground_truth.csv").write_text("\n".join(rows) + "\n")
+    PICKS.write_text(json.dumps(picks, indent=2))
+    print(f"compose: {len(picks)} situations -> {len(picks) * 2} clips in {G.OUT}")
+    return 0
+
+
+if __name__ == "__main__":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "shortlist"
+    table = {"sweep": cmd_sweep, "shortlist": cmd_shortlist, "plan": cmd_plan,
+             "probe": cmd_probe, "ballpix": cmd_ballpix, "select": cmd_select,
+             "render_vis": cmd_render_vis, "render_inv": cmd_render_inv,
+             "compose": cmd_compose}
+    if cmd not in table:
+        sys.exit(f"unknown phase {cmd!r}; known: {' '.join(table)}")
+    sys.exit(table[cmd](sys.argv[2:]))

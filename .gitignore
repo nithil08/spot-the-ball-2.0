@@ -84,3 +84,6 @@ experiments/asset_bundles/
 
 # GEN2 intermediates: sweep logs, per-window frame npz, probe maps (all regenerable)
 GEN2/_cache/
+
+# GEN3 intermediates: same story — sweep logs, probe maps, plates, render npz
+GEN3/_cache/
