@@ -97,28 +97,49 @@ import sys
 
 import numpy as np
 
-from gen2_lib import (ALL_SLOTS, BUNDLE_INV, BUNDLE_VIS, CACHE, CLIP_FRAMES, HERE,
+import gen2_lib as G
+
+# ── 25 fps, to match the rest of the v2 batch ──────────────────────────────────
+# PSF must be set before any env is constructed. CLIP_FRAMES / VIS_FRAMES / MARK_FRAMES
+# / FPS are set on the MODULE because compose_pair and write_clip read them as globals
+# at call time — rebinding only the names imported below would leave those two composing
+# a 50-frame clip out of a 125-frame window and stamping it 10 fps.
+#
+# A PSF=10 probe cache CANNOT be reused: lower PSF makes the built-in AI act more often,
+# so the match diverges. MAPS therefore points at its own directory, and the 10 fps
+# maps in counts/ are left intact rather than overwritten.
+G.PSF = 4
+G.CLIP_FRAMES = CLIP_FRAMES = 125       # 5.0 s at 25 fps
+G.VIS_FRAMES = 25                       # the "1 s visible" half of the split variant
+G.MARK_FRAMES = 8                       # red start-circle, ~0.3 s
+G.FPS = 25
+
+from gen2_lib import (ALL_SLOTS, BUNDLE_INV, BUNDLE_VIS, CACHE, HERE,  # noqa: E402
                       compose_pair, continuous, match_spec, render_window, run_log,
                       write_clip)
 
 OUT = HERE / "04_player_delta"
 PD = CACHE / "player_delta"
-MAPS = PD / "counts"                 # one .npz per probed match
-PICKS = PD / "picks_natural.json"
+MAPS = PD / "counts_psf4"            # one .npz per probed match, at 25 fps
+PICKS = PD / "picks_natural_psf4.json"
 
 END_COUNTS = [6, 10, 12, 16]
 PER_COUNT = 5
 
-PROBE_END = 700        # frames probed per match. Longer than strictly needed to clear
-                       # the kickoff: the 23 env creations per match are fixed cost, so a
-                       # longer range buys more candidate windows at the same overhead.
-SKIP_START = 150       # kickoff / settling — no window may start before this
+# Frame-denominated constants are scaled by 2.5 (PSF 10 -> 4) so each still spans the
+# same amount of TIME. Everything below the blank line is metres or pixels — physics and
+# optics — and is deliberately left alone.
+PROBE_END = 1250       # 50 s of match. NOT 700 x 2.5: the probe is 23 renders per match
+                       # and cost scales with frames, so a straight scaling would have
+                       # tripled the most expensive stage in the batch. 1250 keeps ~150
+                       # candidate windows per match, close to the ~125 v1 actually used.
+SKIP_START = 375       # kickoff / settling — no window may start before this (150 x 2.5)
+STRIDE = 5             # dense window scan, same density in seconds as v1's 2
+
 DOWN = 2               # probe renders at half size; a body is still tens of pixels
 MIN_PIX = 40           # changed (half-size) pixels before a player counts as in frame
-
 NEAR_RADIUS = 0.13     # "near the ball" in pitch units (~13% of the 105 m length)
 MIN_TRAVEL = 0.10      # the ball must cover at least this much ground across the window
-STRIDE = 2             # dense window scan; the data is cached, so this is nearly free
 
 SETPIECE_MODES = (1, 2, 3, 4, 5, 6)      # anything that is not GM_NORMAL
 
@@ -224,9 +245,9 @@ def _shard_todo(shard_i, shard_n):
 def probe_match(lvl, seed):
     """Measure, for every frame, which of the 22 players is inside the camera frame.
 
-    Continuity is NOT checked here. It is a property of the 50-frame window we eventually
-    cut, not of the whole 450-frame probe: rejecting a match because a goal happened at
-    frame 300 throws away frames 150-250, which are fine. Probing is the expensive part,
+    Continuity is NOT checked here. It is a property of the CLIP_FRAMES-long window we
+    eventually cut, not of the whole probe span: rejecting a match because a goal happened
+    late throws away the good frames before it. Probing is the expensive part,
     so probe everything and let phase_pick reject per window.
     """
     plate, _balls = render_window(lvl, seed, 0, PROBE_END,
