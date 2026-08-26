@@ -12,6 +12,38 @@
 - `_gt_debug/clipNN.png` — final frame with a crosshair on the detected ball (sanity check).
 - Regenerate: `python3 ../../gen_final_gt.py`  (reads `_frames/*.npz`).
 
+## People in frame (per-frame headcount)
+How many players are on screen in each of the 1,500 frames. Median **16** of the 22 on
+the pitch, middle half 15–18, full range 7–20; the headcount is flat across the clip
+(per-second means 16.2 / 16.4 / 16.1 / 16.3 / 16.3), so the ball going invisible at 1 s
+does not change how crowded the frame is.
+
+- `people_in_frame.png` — histogram + time course + per-clip heatmap.
+- `people_per_frame.csv` — `clip, frame, t_sec, people, team_blue, team_red, goalkeepers`.
+- `people_per_second.csv` — per clip, per second: mean / min / max.
+- `people_in_frame_summary.json` — the aggregates behind the figure.
+- `people_in_frame_check.png` — four frames with every counted player boxed (sanity check).
+- `_people_counts/vis_seed<seed>.npz` — raw per (clip, frame, slot) body/shadow pixel
+  counts and bounding boxes.
+
+Method — the ball ground-truth diff trick, applied to players. Each seed's window is
+replayed once per player slot with that one player rendered at 2% scale
+(`GFOOTBALL_HIDE_SLOTS`) while he stays fully in play; diffing against the normal render
+isolates exactly his pixels, so "is player N on screen" is a pixel fact rather than a
+colour heuristic (colour segmentation fails on the night-lit clips and counts the crowd
+in the clips that show the stands). A hidden player also loses his shadow, so only
+pixels whose **hue** moves count as body; a player counts as in frame at ≥25 body pixels
+(the mean moves only 16.6 → 15.8 across thresholds 1 → 100, so the cut is not load-bearing).
+Referees are engine-invisible, so 22 is the ceiling.
+
+```
+python3 ../experiments/nithil_work/count_people_render.py 42 --verify   # frames reproduce bit for bit
+for s in 42 7 11 23 3; do python3 ../experiments/nithil_work/count_people_render.py $s; done
+python3 ../experiments/nithil_work/count_people_report.py               # CSVs + summary + figure
+python3 ../experiments/nithil_work/count_people_check.py                # sanity image
+```
+Needs the patched engine tree (`GFOOTBALL_SRC`, default `~/gfootball_src`); ~3 min per seed.
+
 ## Run the model eval
 Runner: `../../run_spot_ball_adc.py`. Sends each clip as inline video + the exact prompt,
 parses `Ball position:`, scores against `ground_truth.csv`. Results land in `eval_runs/`.
