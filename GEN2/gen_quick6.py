@@ -95,8 +95,22 @@ KINDS = {
 # The bounds are deliberately generous — a set piece is legitimately more airborne than
 # open play, and over-tight gates on a 120-match sweep yield nothing. They exclude the
 # rejected region; the RANKING inside it is what picks the best 2.
-ENGAGEMENT = {"loose_max": 0.60, "apex_max": 3.20, "dnear_max": 4.00,
-              "path_min": 0.25, "path_max": 1.20}
+#
+# PER-CLASS, because a single cap cannot be honest about all three. Measured on the first
+# 36 matches of this sweep: every goalkeeper-throw candidate came in at apex 4.3-5.0 while
+# scoring WELL on everything else (loose 0.49-0.58, nearest player 0.7-1.3 m), and the one
+# corner candidate was loose 0.77. Those are the classes, not defects — a keeper's
+# delivery goes up, and a corner is an unowned ball in flight by definition. Capping them
+# at the header's 3.20/0.60 yields zero clips rather than better ones, so each class gets
+# the bound its own physics allows and the ranking picks the calmest instance inside it.
+ENGAGEMENT = {
+    "header":   {"loose_max": 0.60, "apex_max": 3.20, "dnear_max": 4.00,
+                 "path_min": 0.25, "path_max": 1.20},
+    "corner":   {"loose_max": 0.85, "apex_max": 3.60, "dnear_max": 4.00,
+                 "path_min": 0.25, "path_max": 1.20},
+    "gk_throw": {"loose_max": 0.65, "apex_max": 5.20, "dnear_max": 4.00,
+                 "path_min": 0.25, "path_max": 1.20},
+}
 MX, MY = 52.5, 34.0 / 0.42             # normalised pitch units -> metres
 
 
@@ -111,11 +125,12 @@ def coherence(log, s, e):
             "path": float(np.linalg.norm(np.diff(ball[:, :2], axis=0), axis=1).sum())}
 
 
-def engaged(c):
-    return (c["loose"] <= ENGAGEMENT["loose_max"]
-            and c["apex"] <= ENGAGEMENT["apex_max"]
-            and c["dnear"] <= ENGAGEMENT["dnear_max"]
-            and ENGAGEMENT["path_min"] <= c["path"] <= ENGAGEMENT["path_max"])
+def engaged(kind, c):
+    e = ENGAGEMENT[kind]
+    return (c["loose"] <= e["loose_max"]
+            and c["apex"] <= e["apex_max"]
+            and c["dnear"] <= e["dnear_max"]
+            and e["path_min"] <= c["path"] <= e["path_max"])
 
 
 def coherence_score(c):
@@ -178,7 +193,7 @@ def cmd_pick(argv):
                 if not ok_fn(log, s, e, n):
                     continue
                 c = coherence(log, s, e)
-                if not engaged(c):
+                if not engaged(kind, c):
                     rejected += 1
                     continue
                 cand = {"shape": shape, "seed": int(seed), "match": t,
