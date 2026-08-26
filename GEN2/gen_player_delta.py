@@ -38,8 +38,8 @@ HOW THE COUNT IS MEASURED
   each showing exactly one player, and diff them frame by frame. A non-trivial pixel
   difference means that player's body is inside the camera frustum on that frame. Hiding
   is render-only, so all 23 passes replay the identical match. That is 23 replays per
-  match — affordable because the probe is sharded across cores and covers frames 0-450 in
-  one go, giving ~250 candidate windows per match rather than one.
+  match — affordable because the probe is sharded across cores and covers frames 0-700 in
+  one go, giving hundreds of candidate windows per match rather than one.
 
   The published count is this measurement. Clips hide nobody; the probe passes exist only
   to count, and are thrown away.
@@ -50,8 +50,22 @@ WHAT ELSE A WINDOW MUST SATISFY  (this is what fixes 1-3)
     players are on screen at all
   * the ball actually travels rather than sitting at someone's feet
   * the on-screen players are gathered around the play, not strung out to the edges
-  * no set piece, goal or restart inside the window
+  * no set piece AWARDED inside the window (one already pending when the window opens is
+    fine — that is just play resuming); no goal, no teleport
   * nothing from the opening SKIP_START frames, which is the kickoff
+
+END_COUNT = 6 IS THE HARD ONE, AND IT IS CAMERA GEOMETRY, NOT A BUG
+  Measured over 4500 windows in 36 matches: the camera frames exactly 6 players on 0.8% of
+  end-frames, and of those 37 windows, 27 had a restart awarded inside and 9 had the ball
+  unattended — one was usable. The reason is structural: with the stock tracking camera,
+  "few players on screen" almost always means play is jammed into a corner, which is
+  precisely when the ball is about to go out. Few-players and stoppage are the same event.
+
+  The counterattack bases (pd19-pd21) exist to break that coupling — a break into open
+  ground is the one situation where live, attended play genuinely frames very few bodies.
+  If 6 still cannot be filled, widen the seeds on those rather than relaxing the
+  near-ball or restart tests: those tests are exactly what the rejected first batch
+  failed.
 
 THE PROBE PROCESS DIES AFTER ABOUT 46 ENGINE INSTANCES — RUN IT ONE MATCH AT A TIME
   Observed three times, and the third time pinned it down: four independent shards each
@@ -65,15 +79,14 @@ THE PROBE PROCESS DIES AFTER ABOUT 46 ENGINE INSTANCES — RUN IT ONE MATCH AT A
   once PER MATCH from a shell loop, not once for a whole shard. Each invocation writes its
   own map file and already-probed matches are skipped, so the loop is safe to re-run.
 
-      for i in 0 1 2 3; do
-        ( while python3 gen_player_delta.py probe_one --shard $i/4; do :; done ) &
-      done
+  Exit codes carry the distinction the loop needs: 0 = did one match, 3 = shard empty,
+  ANYTHING ELSE = the process died and the loop must retry with a fresh one. Using 1 for
+  "shard empty" was a real bug — it is indistinguishable from a crash, so every shard
+  stopped after its first match and the probe reported success with 13 of 39 maps. See
+  run_tonight.sh for the driving loop.
 
-  `probe_one` probes a single unprobed match from the shard and exits 0 if it did work,
-  1 when the shard has nothing left — so the `while` loop terminates on its own.
-
-Run:  python3 gen_player_delta.py probe_one [--shard i/n]  # ONE match, then exits
-      python3 gen_player_delta.py probe [--shard i/n]      # all of a shard: DIES, see above
+Run:  bash run_tonight.sh                                  # the whole thing, end to end
+      python3 gen_player_delta.py probe_one [--shard i/n]  # ONE match, then exits
       python3 gen_player_delta.py pick
       python3 gen_player_delta.py vis && ... inv && ... compose
 Out:  GEN2/04_player_delta/{full_visibility,split_1s_4s}/
@@ -96,7 +109,9 @@ PICKS = PD / "picks_natural.json"
 END_COUNTS = [6, 10, 12, 16]
 PER_COUNT = 5
 
-PROBE_END = 450        # frames probed per match; deep enough to leave the kickoff behind
+PROBE_END = 700        # frames probed per match. Longer than strictly needed to clear
+                       # the kickoff: the 23 env creations per match are fixed cost, so a
+                       # longer range buys more candidate windows at the same overhead.
 SKIP_START = 150       # kickoff / settling — no window may start before this
 DOWN = 2               # probe renders at half size; a body is still tens of pixels
 MIN_PIX = 40           # changed (half-size) pixels before a player counts as in frame
@@ -125,30 +140,58 @@ SETPIECE_MODES = (1, 2, 3, 4, 5, 6)      # anything that is not GM_NORMAL
 # where the scarcity is.
 MID_SEEDS = [11, 23, 37]
 WIDE_SEEDS = [11, 23, 37, 53, 71]
+BAL_SEEDS = [11, 23, 37, 53, 71, 89, 101]
 
+# WIDE BUT BALANCED is the shape that actually yields a 6-player frame worth using.
+#
+# The mismatch shapes below (pd09-pd14, a strong side camped on a weak one) do put play
+# in a corner where the camera frames few bodies — but the weak side just hoofs the ball
+# out, and a restart inside the window disqualifies it. Measured over 36 probed matches:
+# pd11 2.2 restarts/match, pd12 2.0, pd09 1.8, against 0.7 for balanced midfield pd02.
+# That is why 27 of the 37 six-player windows found so far die on "restart awarded
+# mid-clip" and only one survived.
+#
+# pd15-pd18 keep the ball wide but make the two sides even, so wide play is contested and
+# stays alive instead of being cleared into touch. They get the most seeds because
+# end_count=6 is the one target still short.
 BASES = [
-    # name,      ball,            push(l, r),     difficulty,    offsides, wide?
-    ("g2_pd01", (0.00, 0.00), (0.00, 0.00), (0.80, 0.80), True, False),    # midfield
-    ("g2_pd02", (0.20, 0.12), (0.25, 0.15), (0.80, 0.80), True, False),
-    ("g2_pd03", (-0.15, -0.10), (0.15, 0.30), (0.90, 0.70), True, False),
-    ("g2_pd09", (0.75, 0.34), (0.65, 0.40), (1.00, 0.30), False, True),    # wide, final third
-    ("g2_pd10", (0.85, -0.32), (0.70, 0.45), (1.00, 0.20), False, True),
-    ("g2_pd11", (0.90, 0.10), (0.75, 0.45), (1.00, 0.10), False, True),    # camped on the box
-    ("g2_pd12", (-0.90, -0.10), (0.45, 0.75), (0.10, 1.00), False, True),
-    ("g2_pd13", (-0.75, -0.34), (0.40, 0.65), (0.30, 1.00), False, True),
-    ("g2_pd14", (0.62, 0.38), (0.55, 0.35), (0.90, 0.40), False, True),    # on the touchline
+    # name,      ball,            push(l, r),     difficulty,    offsides, seeds
+    ("g2_pd01", (0.00, 0.00), (0.00, 0.00), (0.80, 0.80), True, MID_SEEDS),   # midfield
+    ("g2_pd02", (0.20, 0.12), (0.25, 0.15), (0.80, 0.80), True, MID_SEEDS),
+    ("g2_pd03", (-0.15, -0.10), (0.15, 0.30), (0.90, 0.70), True, MID_SEEDS),
+    ("g2_pd09", (0.75, 0.34), (0.65, 0.40), (1.00, 0.30), False, WIDE_SEEDS),
+    ("g2_pd10", (0.85, -0.32), (0.70, 0.45), (1.00, 0.20), False, WIDE_SEEDS),
+    ("g2_pd11", (0.90, 0.10), (0.75, 0.45), (1.00, 0.10), False, WIDE_SEEDS),
+    ("g2_pd12", (-0.90, -0.10), (0.45, 0.75), (0.10, 1.00), False, WIDE_SEEDS),
+    ("g2_pd13", (-0.75, -0.34), (0.40, 0.65), (0.30, 1.00), False, WIDE_SEEDS),
+    ("g2_pd14", (0.62, 0.38), (0.55, 0.35), (0.90, 0.40), False, WIDE_SEEDS),
+    # wide AND even — contested wide play that stays in play
+    ("g2_pd15", (0.70, 0.36), (0.50, 0.45), (0.80, 0.80), True, BAL_SEEDS),
+    ("g2_pd16", (-0.70, -0.36), (0.45, 0.50), (0.80, 0.80), True, BAL_SEEDS),
+    ("g2_pd17", (0.80, -0.30), (0.55, 0.50), (0.85, 0.85), True, BAL_SEEDS),
+    ("g2_pd18", (0.45, 0.38), (0.40, 0.40), (0.80, 0.80), True, BAL_SEEDS),
+    # COUNTERATTACK shapes — the one situation where live play genuinely frames very few
+    # players. One side is committed far up the pitch (push 0.70-0.80) against a side
+    # sitting deep (push 0.00-0.10); when the deep side wins it back, the ball breaks into
+    # open ground with a runner and a chaser and nobody else, while the committed team is
+    # stranded behind the camera. That is a handful of bodies on screen WITH the ball
+    # attended and the play live — unlike a corner, where few players on screen means the
+    # ball is about to go out. Balanced difficulty so turnovers actually happen.
+    ("g2_pd19", (0.30, 0.05), (0.78, 0.00), (0.80, 0.80), True, BAL_SEEDS),
+    ("g2_pd20", (-0.30, -0.05), (0.00, 0.78), (0.80, 0.80), True, BAL_SEEDS),
+    ("g2_pd21", (0.10, 0.22), (0.72, 0.05), (0.85, 0.85), True, BAL_SEEDS),
 ]
 
 
 def bases():
-    for name, ball, (pl, pr), diff, offs, _wide in BASES:
+    for name, ball, (pl, pr), diff, offs, _seeds in BASES:
         yield name, match_spec(name, ball=ball, offsides=offs, difficulty=diff,
                                push_left=pl, push_right=pr)
 
 
 def jobs():
-    for name, _ball, _push, _diff, _offs, wide in BASES:
-        for seed in (WIDE_SEEDS if wide else MID_SEEDS):
+    for name, _ball, _push, _diff, _offs, seeds in BASES:
+        for seed in seeds:
             yield name, seed
 
 
