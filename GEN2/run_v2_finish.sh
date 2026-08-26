@@ -32,6 +32,17 @@ quiet() { grep -vE "Gym has been unmaintained|Please upgrade to Gymnasium|migrat
 echo ""
 echo "======== situations v2 starting $(date '+%Y-%m-%d %H:%M:%S') ========"
 
+# ── corners: re-gated because the gate now also requires the ball in shot ───────
+# The first build died in detect_ball on an all-zero difference: sliding chases
+# players, and on that window the camera settled on a crowd before the ball arrived.
+# Occupancy is cached per window, so this is a fresh measurement, not a re-sweep.
+echo ""
+echo "---- corner: gate ---- $(date '+%H:%M:%S')"
+$PY gen_corners_v2.py gate 2>&1 | quiet
+echo "---- corner: build ---- $(date '+%H:%M:%S')"
+$PY gen_corners_v2.py build 2>&1 | quiet
+echo "corner build exit: $?"
+
 for kind in header gk_throw; do
   echo ""
   echo "---- $kind: pick ---- $(date '+%H:%M:%S')"

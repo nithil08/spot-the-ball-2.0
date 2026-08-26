@@ -37,10 +37,18 @@ A SWEEP CACHED AT PSF=10 CANNOT BE REUSED AT PSF=4. Lower PSF makes the built-in
 act more often, so the match diverges — identical for ~10 s, then a discrete event
 flips it (max ball-track difference 0.51 on pressL2 s7). v2 keeps its own sweep cache.
 
+ONE BUNDLE PER PROCESS. `use_bundle` sets GFOOTBALL_DATA_DIR and the engine reads it
+once, at import, so the visible and ball-invisible renders cannot happen in the same
+process — switching mid-run silently keeps the first bundle and yields two identical
+renders, which surfaces much later as a divide-by-zero inside detect_ball. `build` is
+therefore an orchestrator that spawns render_vis, render_inv and compose separately,
+the same shape gen_situations.py and gen_player_delta.py already use.
+
 Run:
     python3 gen_corners_v2.py sweep [--shard i/n]   # one match per process
     python3 gen_corners_v2.py pick                  # log gates -> shortlist
-    python3 gen_corners_v2.py build                 # render, gate on occupancy, write
+    python3 gen_corners_v2.py gate                  # render + measure occupancy
+    python3 gen_corners_v2.py build                 # render_vis -> render_inv -> compose
 """
 import json
 import os
@@ -256,6 +264,14 @@ def compose(vis, inv):
     opening second, so a model sees the same lead-in either way."""
     from grid import build_grid, burn_grid, circle_ball, detect_ball
     overlay = build_grid()
+    # detect_ball divides by the difference mass, so an off-screen ball surfaces as a
+    # ZeroDivisionError from inside numpy. Say what actually went wrong instead: the
+    # gate is supposed to have excluded this window (see slide's ball constraint).
+    for label, v, i in (("first", vis[0], inv[0]), ("final", vis[-1], inv[-1])):
+        if not ball_onscreen([v], [i])[0]:
+            raise ValueError(
+                f"{label} frame has no ball on screen — the occupancy gate let a "
+                f"ball-less window through; re-run `gate` for this window")
     spx, spy = detect_ball(vis[0], inv[0])
     fpx, fpy = detect_ball(vis[-1], inv[-1])
 
@@ -275,17 +291,41 @@ def compose(vis, inv):
 OCCUPANCY = CACHE / "occupancy.json"
 
 
-def slide(counts, areas):
+def ball_onscreen(vis, inv, thr=40, min_px=3):
+    """Per-frame: is the ball actually in shot?
+
+    Same visible-vs-invisible difference the ground truth is measured from, so a frame
+    counts as holding the ball exactly when `detect_ball` would be able to locate it.
+    `thr` matches detect_ball's own floor in grid.py.
+    """
+    out = []
+    for a, b in zip(vis, inv):
+        d = np.abs(a.astype(np.int16) - b.astype(np.int16)).sum(axis=2)
+        out.append(bool((d > thr).sum() >= min_px))
+    return np.array(out)
+
+
+def slide(counts, areas, has_ball=None):
     """Pick the CLIP_FRAMES-long sub-window with the best worst frame.
 
-    Ties go to the EARLIEST offset, which keeps the clip as close to the delivery as
-    the occupancy floor allows — the point is to skip the camera's empty traverse,
-    not to drift downfield looking for a crowd.
+    Ties go to the EARLIEST offset, which keeps the clip as close to the anchor as the
+    occupancy floor allows — the point is to skip the camera's empty traverse, not to
+    drift downfield looking for a crowd.
+
+    THE BALL CONSTRAINT IS ABSOLUTE, NOT A PREFERENCE. Sliding chases players, and the
+    camera can settle on a crowd while the ball is still out of shot — which is how the
+    first build died: detect_ball got an all-zero difference and divided by zero. A clip
+    whose final frame has no ball on screen has no answer on the grid, so any offset
+    with a ball-less frame is not a worse candidate, it is not a candidate.
+
+    Returns (offset, counts, areas) or (None, ...) when no offset keeps the ball.
     """
     n_off = len(counts) - CLIP_FRAMES + 1
-    if n_off <= 1:
-        return 0, counts[:CLIP_FRAMES], areas[:CLIP_FRAMES]
-    best = max(range(n_off), key=lambda o: (counts[o:o + CLIP_FRAMES].min(), -o))
+    legal = [o for o in range(max(n_off, 1))
+             if has_ball is None or has_ball[o:o + CLIP_FRAMES].all()]
+    if not legal:
+        return None, counts[:CLIP_FRAMES], areas[:CLIP_FRAMES]
+    best = max(legal, key=lambda o: (counts[o:o + CLIP_FRAMES].min(), -o))
     return best, counts[best:best + CLIP_FRAMES], areas[best:best + CLIP_FRAMES]
 
 
@@ -310,24 +350,31 @@ def cmd_gate(argv):
             continue                       # one corner per match, for source diversity
         seen.add(r["match"])
         key = f"{r['match']}@{r['start']}"
-        if key in done and "offset" in done[key]:
-            continue                       # records without a slid offset are redone
+        if key in done and "counts_full" in done[key]:
+            continue                       # records predating a gate change are redone
         use_bundle(G.BUNDLE_VIS)
         lvl = write_scenario(shape_spec(r["shape"]), force=False)
         probe_end = r["end"] + r.get("max_off", 0)
         vis, _b = render_window(lvl, r["seed"], r["start"], probe_end)
         empty, _b = render_window(lvl, r["seed"], r["start"], probe_end,
                                   hide_slots=",".join(ALL_SLOTS))
-        counts, areas = onscreen_counts(vis, empty)
+        counts_full, areas_full = onscreen_counts(vis, empty)
         del vis, empty
-        off, counts, areas = slide(counts, areas)
+        # Provisional slide, occupancy only. The BALL constraint cannot be applied in
+        # this process: it needs the ball-invisible bundle, and the bundle is fixed for
+        # the life of a process — use_bundle sets GFOOTBALL_DATA_DIR, which the engine
+        # reads once, at import. phase_compose re-slides with both constraints once it
+        # has both renders on disk, which is why the whole probe-span trace is stored.
+        off, counts, _a = slide(counts_full, areas_full)
         # The per-frame trace is what says whether emptiness is a dodgeable moment
         # (a contiguous dip at a fixed offset — re-time the window) or intrinsic to
         # how the camera covers a corner (scattered — only more sweeping helps).
         done[key] = {"min": int(counts.min()), "med": int(np.median(counts)),
                      "p10": int(np.percentile(counts, 10)),
-                     "area_med": int(np.median(areas)),
-                     "offset": int(off), "per_frame": counts.tolist()}
+                     "area_med": int(np.median(areas_full)),
+                     "offset": int(off), "no_ball": False,
+                     "counts_full": counts_full.tolist(),
+                     "per_frame": counts.tolist()}
         OCCUPANCY.write_text(json.dumps(done, indent=1))
         verdict = "PASS" if counts.min() >= MIN_ONSCREEN else "fail"
         print(f"  {verdict} {key}: min on screen {counts.min():2d}, "
@@ -339,30 +386,123 @@ def cmd_gate(argv):
     return 0
 
 
-def cmd_build(argv):
-    from lib import use_bundle, frames_to_mov
-    from scenario_factory import write_scenario
+def selected():
+    """The windows that clear the occupancy floor, best worst-frame first.
+
+    Shared by all three build phases so they cannot disagree about what is being
+    rendered — the phases are separate processes and re-derive this independently.
+    """
     rows = json.loads(SHORTLIST.read_text())
     occ = json.loads(OCCUPANCY.read_text())
-
     # Rank by the WORST frame, not the average: the v1 defect was a good clip with a
     # dead second in it, which an average hides completely.
-    cand = []
-    seen = set()
+    cand, seen = [], set()
     for r in rows:
         key = f"{r['match']}@{r['start']}"
         if key not in occ or r["match"] in seen:
             continue
         seen.add(r["match"])
-        # The measured window is the SLID one, so the clip must be rendered there.
-        off = occ[key].get("offset", 0)
-        r.update(min_onscreen=occ[key]["min"], med_onscreen=occ[key]["med"],
-                 offset=off, start=r["start"] + off, end=r["start"] + off + CLIP_FRAMES)
+        o = occ[key]
+        r.update(min_onscreen=o["min"], med_onscreen=o["med"], offset=o.get("offset", 0),
+                 counts_full=o.get("counts_full"), probe_start=r["start"],
+                 probe_end=r["end"] + r.get("max_off", 0), key=key)
         cand.append(r)
     cand.sort(key=lambda r: (-r["min_onscreen"], -r["med_onscreen"]))
-    kept = [r for r in cand if r["min_onscreen"] >= MIN_ONSCREEN][:N_WANT]
+    return cand, [r for r in cand if r["min_onscreen"] >= MIN_ONSCREEN][:N_WANT]
 
+
+FRAMES = CACHE / "build_frames"
+
+
+def phase_render(bundle, tag):
+    """Render every selected window's FULL probe span under one bundle, to disk.
+
+    The probe span rather than the final 125 frames because the definitive slide
+    happens in phase_compose, which is the first place both bundles' pixels coexist.
+    """
+    from lib import use_bundle
+    use_bundle(bundle)                      # before gfootball is imported, once
+    from scenario_factory import write_scenario
+    _cand, kept = selected()
+    FRAMES.mkdir(parents=True, exist_ok=True)
+    for r in kept:
+        dst = FRAMES / f"{r['key'].replace('@', '_')}_{tag}.npz"
+        if dst.exists():
+            continue
+        lvl = write_scenario(shape_spec(r["shape"]), force=False)
+        fr, _b = render_window(lvl, r["seed"], r["probe_start"], r["probe_end"])
+        np.savez_compressed(dst, frames=np.asarray(fr))
+        print(f"  {tag}: {r['key']} ({len(fr)} frames)", flush=True)
+    return 0
+
+
+def phase_compose():
+    """Slide with BOTH constraints, cut, compose, write. No engine here — this phase
+    only needs the two renders on disk, so it is bundle-agnostic."""
+    import csv
+    from lib import frames_to_mov
+    _cand, kept = selected()
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "full_visibility").mkdir(exist_ok=True)
+    (OUT / "split_1s_4s").mkdir(exist_ok=True)
+    written, short = [], []
+    for r in kept:
+        stem = r["key"].replace("@", "_")
+        vis = np.load(FRAMES / f"{stem}_vis.npz")["frames"]
+        inv = np.load(FRAMES / f"{stem}_inv.npz")["frames"]
+        has_ball = ball_onscreen(vis, inv)
+        counts = np.array(r["counts_full"])
+        off, counts_w, _a = slide(counts, counts, has_ball)
+        if off is None:
+            short.append((r["key"], int(has_ball.sum()), len(has_ball)))
+            continue
+        r.update(offset=int(off), start=r["probe_start"] + off,
+                 end=r["probe_start"] + off + CLIP_FRAMES,
+                 min_onscreen=int(counts_w.min()), med_onscreen=int(np.median(counts_w)),
+                 vis=vis[off:off + CLIP_FRAMES], inv=inv[off:off + CLIP_FRAMES])
+        written.append(r)
+
+    for key, got, tot in short:
+        print(f"  dropped {key}: no offset keeps the ball in shot ({got}/{tot} frames)")
+    if len(written) < N_WANT:
+        print(f"\nonly {len(written)} of {N_WANT} windows survive both gates. "
+              f"Gate more candidates (occupancy is cached, so only new windows render).")
+
+    with open(OUT / "ground_truth.csv", "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["clip", "shape", "seed", "match", "start_frame", "end_frame",
+                    "n_frames", "fps", "seconds", "start_px", "start_py",
+                    "final_px", "final_py", "min_onscreen", "med_onscreen", "apex",
+                    "slid_frames"])
+        for i, r in enumerate(written, 1):
+            name = f"corner_kick_{i:02d}"
+            full, split, (spx, spy), (fpx, fpy) = compose(r["vis"], r["inv"])
+            frames_to_mov(full, OUT / "full_visibility" / f"{name}.mov",
+                          fps=FPS, crop_hud=False)
+            frames_to_mov(split, OUT / "split_1s_4s" / f"{name}.mov",
+                          fps=FPS, crop_hud=False)
+            w.writerow([name, r["shape"], r["seed"], r["match"], r["start"], r["end"],
+                        CLIP_FRAMES, FPS, round(CLIP_FRAMES / FPS, 2),
+                        round(spx, 1), round(spy, 1), round(fpx, 1), round(fpy, 1),
+                        r["min_onscreen"], r["med_onscreen"], r["apex"], r["offset"]])
+            print(f"wrote {name}: {CLIP_FRAMES} frames @ {FPS} fps, "
+                  f"min on screen {r['min_onscreen']}, slid +{r['offset']}")
+    print(f"\n{len(written)} clips written to {OUT}")
+    return 0 if len(written) >= N_WANT else 1
+
+
+def cmd_build(argv):
+    """Orchestrator: one subprocess per bundle, then compose.
+
+    A bundle is chosen by GFOOTBALL_DATA_DIR before gfootball is imported and cannot be
+    changed afterwards, so the visible and invisible renders MUST happen in separate
+    processes. Doing it inline is the bug that made the first build produce two
+    identical renders and divide by zero in detect_ball.
+    """
+    import subprocess
+    _cand, kept = selected()
     if len(kept) < N_WANT:
+        cand = _cand
         print(f"only {len(kept)} of {len(cand)} windows clear the >= {MIN_ONSCREEN} "
               f"floor; need {N_WANT}. Best available:")
         for r in cand[:8]:
@@ -372,41 +512,22 @@ def cmd_build(argv):
               "shortage, not the front-of-clip dip. Sweep more seeds (SEEDS in this "
               "file) rather than lowering the floor — the floor is the fix.")
         return 1
-
-    for r in kept:
-        use_bundle(G.BUNDLE_VIS)
-        lvl = write_scenario(shape_spec(r["shape"]), force=False)
-        r["vis"], _b = render_window(lvl, r["seed"], r["start"], r["end"])
-        use_bundle(G.BUNDLE_INV)
-        r["inv"], _b = render_window(lvl, r["seed"], r["start"], r["end"])
-
-    OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "full_visibility").mkdir(exist_ok=True)
-    (OUT / "split_1s_4s").mkdir(exist_ok=True)
-    import csv
-    with open(OUT / "ground_truth.csv", "w", newline="") as fh:
-        w = csv.writer(fh)
-        w.writerow(["clip", "shape", "seed", "match", "start_frame", "end_frame",
-                    "n_frames", "fps", "seconds", "start_px", "start_py",
-                    "final_px", "final_py", "min_onscreen", "med_onscreen", "apex",
-                    "slid_frames"])
-        for i, r in enumerate(kept, 1):
-            name = f"corner_kick_{i:02d}"
-            full, split, (spx, spy), (fpx, fpy) = compose(r["vis"], r["inv"])
-            frames_to_mov(full, OUT / "full_visibility" / f"{name}.mov", fps=FPS, crop_hud=False)
-            frames_to_mov(split, OUT / "split_1s_4s" / f"{name}.mov", fps=FPS, crop_hud=False)
-            w.writerow([name, r["shape"], r["seed"], r["match"], r["start"], r["end"],
-                        CLIP_FRAMES, FPS, round(CLIP_FRAMES / FPS, 2),
-                        round(spx, 1), round(spy, 1), round(fpx, 1), round(fpy, 1),
-                        r["min_onscreen"], r["med_onscreen"], r["apex"],
-                        r.get("offset", 0)])
-            print(f"wrote {name}: {CLIP_FRAMES} frames @ {FPS} fps, "
-                  f"min on screen {r['min_onscreen']}")
-    print(f"\n{len(kept)} clips written to {OUT}")
-    return 0
+    for phase in ("render_vis", "render_inv", "compose"):
+        print(f"-- {phase}", flush=True)
+        rc = subprocess.run([sys.executable, __file__, phase]).returncode
+        if rc != 0 and phase != "compose":
+            print(f"{phase} failed rc={rc}")
+            return rc
+    return rc
 
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "pick"
+    if cmd == "render_vis":
+        sys.exit(phase_render(G.BUNDLE_VIS, "vis"))
+    if cmd == "render_inv":
+        sys.exit(phase_render(G.BUNDLE_INV, "inv"))
+    if cmd == "compose":
+        sys.exit(phase_compose())
     sys.exit({"sweep": cmd_sweep, "pick": cmd_pick, "gate": cmd_gate,
               "build": cmd_build}[cmd](sys.argv[2:]))

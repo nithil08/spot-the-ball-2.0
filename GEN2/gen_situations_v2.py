@@ -55,7 +55,7 @@ import numpy as np                                      # noqa: E402
 from gen2_lib import (ALL_SLOTS, continuous, render_window,  # noqa: E402
                       shape_spec)
 from gen_corners_v2 import (CLIP_FRAMES, FPS, MIN_ONSCREEN, PROBE_EXTRA,  # noqa: E402
-                            SWEEP, compose, no_setpiece_inside,
+                            SWEEP, ball_onscreen, compose, no_setpiece_inside,
                             onscreen_counts, slide)
 
 PSF_SCALE = 2.5             # 10 / 4 — every frame-denominated constant stretches by this
@@ -219,11 +219,14 @@ def cmd_gate(argv):
     shortlist, occ_path, _ = paths(kind)
     rows = json.loads(shortlist.read_text())
     done = json.loads(occ_path.read_text()) if occ_path.exists() else {}
-    n_pass = sum(1 for v in done.values() if v["min"] >= MIN_ONSCREEN)
+    # Only count records the CURRENT gate produced; stale ones are about to be redone
+    # and would otherwise be counted twice.
+    n_pass = sum(1 for v in done.values()
+                 if "no_ball" in v and v["min"] >= MIN_ONSCREEN)
     for r in rows[:budget]:
         key = f"{r['match']}@{r['start']}"
-        if key in done:
-            continue
+        if key in done and "counts_full" in done[key]:
+            continue                       # records predating a gate change are redone
         if n_pass >= N_WANT:
             break                      # enough winners; stop paying for renders
         use_bundle(G.BUNDLE_VIS)
@@ -232,11 +235,15 @@ def cmd_gate(argv):
         vis, _b = render_window(lvl, r["seed"], r["start"], probe_end)
         empty, _b = render_window(lvl, r["seed"], r["start"], probe_end,
                                   hide_slots=",".join(ALL_SLOTS))
-        counts, areas = onscreen_counts(vis, empty)
+        counts_full, areas_full = onscreen_counts(vis, empty)
         del vis, empty
-        off, counts, areas = slide(counts, areas)
+        # Occupancy only — the ball constraint needs the other bundle, and a bundle is
+        # fixed for the life of a process. phase_compose applies it. See gen_corners_v2.
+        off, counts, _a = slide(counts_full, areas_full)
         done[key] = {"min": int(counts.min()), "med": int(np.median(counts)),
-                     "offset": int(off), "per_frame": counts.tolist()}
+                     "offset": int(off), "no_ball": False,
+                     "counts_full": counts_full.tolist(),
+                     "per_frame": counts.tolist()}
         occ_path.write_text(json.dumps(done, indent=1))
         ok = counts.min() >= MIN_ONSCREEN
         n_pass += ok
@@ -247,39 +254,93 @@ def cmd_gate(argv):
 
 
 # ── 4. build ───────────────────────────────────────────────────────────────────
-def cmd_build(argv):
-    import csv
-    from lib import use_bundle, frames_to_mov
-    from scenario_factory import write_scenario
-    kind = argv[0]
+FRAMES = CACHE / "build_frames"
+
+
+def selected(kind):
+    """Windows clearing the occupancy floor, best worst-frame first. Shared by all
+    three build phases, which are separate processes and re-derive it independently."""
     shortlist, occ_path, out = paths(kind)
     rows = json.loads(shortlist.read_text())
-    occ = json.loads(occ_path.read_text())
-
+    occ = json.loads(occ_path.read_text()) if occ_path.exists() else {}
     cand = []
     for r in rows:
         key = f"{r['match']}@{r['start']}"
         if key not in occ or occ[key]["min"] < MIN_ONSCREEN:
             continue
-        off = occ[key]["offset"]
-        r.update(min_onscreen=occ[key]["min"], med_onscreen=occ[key]["med"],
-                 offset=off, start=r["start"] + off,
-                 end=r["start"] + off + CLIP_FRAMES)
+        o = occ[key]
+        r.update(min_onscreen=o["min"], med_onscreen=o["med"], offset=o["offset"],
+                 counts_full=o.get("counts_full"), probe_start=r["start"],
+                 probe_end=r["end"] + r.get("max_off", 0), key=key)
         cand.append(r)
     cand.sort(key=lambda r: (-r["min_onscreen"], -r["score"]))
-    kept = cand[:N_WANT]
+    return cand, cand[:N_WANT], out
+
+
+def phase_render(kind, bundle, tag):
+    """Render every selected window's full probe span under ONE bundle, to disk."""
+    from lib import use_bundle
+    use_bundle(bundle)                      # before gfootball is imported, once
+    from scenario_factory import write_scenario
+    _cand, kept, _out = selected(kind)
+    FRAMES.mkdir(parents=True, exist_ok=True)
+    for r in kept:
+        dst = FRAMES / f"{kind}_{r['key'].replace('@', '_')}_{tag}.npz"
+        if dst.exists():
+            continue
+        lvl = write_scenario(shape_spec(r["shape"]), force=False)
+        fr, _b = render_window(lvl, r["seed"], r["probe_start"], r["probe_end"])
+        np.savez_compressed(dst, frames=np.asarray(fr))
+        print(f"  {tag}: {r['key']} ({len(fr)} frames)", flush=True)
+    return 0
+
+
+def cmd_build(argv):
+    """Orchestrator: one subprocess per bundle, then compose. A bundle is fixed at
+    import, so visible and invisible renders cannot share a process."""
+    import subprocess
+    kind = argv[0]
+    _cand, kept, _out = selected(kind)
     if len(kept) < N_WANT:
-        print(f"only {len(kept)} of {len(occ)} measured windows clear the "
-              f">= {MIN_ONSCREEN} floor; need {N_WANT}.")
+        print(f"only {len(kept)} windows clear the >= {MIN_ONSCREEN} floor; "
+              f"need {N_WANT}.")
         print("Gate more candidates, or sweep more seeds — do not lower the floor.")
         return 1
+    rc = 0
+    for phase in ("render_vis", "render_inv", "compose"):
+        print(f"-- {kind} {phase}", flush=True)
+        rc = subprocess.run([sys.executable, __file__, phase, kind]).returncode
+        if rc != 0 and phase != "compose":
+            print(f"{phase} failed rc={rc}")
+            return rc
+    return rc
 
+
+def phase_compose(kind):
+    """Slide with BOTH constraints, cut, compose, write. No engine — bundle-agnostic."""
+    import csv
+    from lib import frames_to_mov
+    _cand, kept, out = selected(kind)
+    written, short = [], []
     for r in kept:
-        use_bundle(G.BUNDLE_VIS)
-        lvl = write_scenario(shape_spec(r["shape"]), force=False)
-        r["vis"], _b = render_window(lvl, r["seed"], r["start"], r["end"])
-        use_bundle(G.BUNDLE_INV)
-        r["inv"], _b = render_window(lvl, r["seed"], r["start"], r["end"])
+        stem = f"{kind}_{r['key'].replace('@', '_')}"
+        vis = np.load(FRAMES / f"{stem}_vis.npz")["frames"]
+        inv = np.load(FRAMES / f"{stem}_inv.npz")["frames"]
+        has_ball = ball_onscreen(vis, inv)
+        counts = np.array(r["counts_full"])
+        off, counts_w, _a = slide(counts, counts, has_ball)
+        if off is None:
+            short.append((r["key"], int(has_ball.sum()), len(has_ball)))
+            continue
+        r.update(offset=int(off), start=r["probe_start"] + off,
+                 end=r["probe_start"] + off + CLIP_FRAMES,
+                 min_onscreen=int(counts_w.min()),
+                 med_onscreen=int(np.median(counts_w)),
+                 vis=vis[off:off + CLIP_FRAMES], inv=inv[off:off + CLIP_FRAMES])
+        written.append(r)
+    for key, got, tot in short:
+        print(f"  dropped {key}: no offset keeps the ball in shot ({got}/{tot} frames)")
+    kept = written
 
     out.mkdir(parents=True, exist_ok=True)
     (out / "full_visibility").mkdir(exist_ok=True)
@@ -305,10 +366,16 @@ def cmd_build(argv):
                         r["offset"]])
             print(f"wrote {name}: min on screen {r['min_onscreen']}, slid +{r['offset']}")
     print(f"\n{len(kept)} {kind} clips written to {out}")
-    return 0
+    return 0 if len(kept) >= N_WANT else 1
 
 
 if __name__ == "__main__":
     cmd = sys.argv[1]
+    if cmd == "render_vis":
+        sys.exit(phase_render(sys.argv[2], G.BUNDLE_VIS, "vis"))
+    if cmd == "render_inv":
+        sys.exit(phase_render(sys.argv[2], G.BUNDLE_INV, "inv"))
+    if cmd == "compose":
+        sys.exit(phase_compose(sys.argv[2]))
     sys.exit({"sweep": cmd_sweep, "pick": cmd_pick, "gate": cmd_gate,
               "build": cmd_build}[cmd](sys.argv[2:]))
