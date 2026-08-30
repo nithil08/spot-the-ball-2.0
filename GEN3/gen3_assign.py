@@ -24,7 +24,10 @@ THE MODEL
 
   The (m, c) node is what makes "one clip per match" and "this window has this count"
   compose properly: the match's single unit of flow has to choose exactly one count, and
-  the edge cost is the best coherence available at that count. Max flow below 24 means the
+  the edge cost is the cheapest window available at that count under the spread penalty
+  in force for this iteration — coherence alone on the first, unpenalised solve. A pair
+  keeps every one of its windows, so choosing between them stays a live decision rather
+  than one frozen before the spread is known. Max flow below 24 means the
   spec is genuinely infeasible on the candidate pool, and which edge is saturated says
   why — that is worth far more than a greedy run that silently ships 21 clips.
 
@@ -96,22 +99,26 @@ def _row_col(cell):
 
 
 def solve(cands, counts, per_count, quota, iters=60, w_cell=900, w_row=260, w_col=150,
-          verbose=True):
+          w_obj=0.06, w_step=8.0, verbose=True):
     """Choose the clips. `cands` is a list of dicts with match/kind/count/cell/coh.
 
     Returns (picks, report). picks is empty when the flow cannot reach the target size,
     and the report says which class or count could not be filled.
     """
     target = len(counts) * per_count
-    # best window per (match, count) — a match contributes at most one clip anyway
-    best = {}
+    # All windows of a (match, count), not just the most coherent one. A match contributes
+    # at most one clip, so the flow still needs a single representative per pair — but
+    # WHICH window represents the pair has to be decided under the current spread penalty,
+    # not once up front by coherence. Collapsing to the most coherent window first threw
+    # away exactly the diversity the reweighting is trying to find: the pool holds every
+    # grid row, yet a match whose count-12 windows include a row-E ball is invisible as a
+    # row-E option if its most coherent count-12 window happens to sit in row C.
+    by_pair = collections.defaultdict(list)
     for c in cands:
         if c["count"] not in counts:
             continue
-        k = (c["match"], c["count"])
-        if k not in best or c["coh"] < best[k]["coh"]:
-            best[k] = c
-    pool = list(best.values())
+        by_pair[(c["match"], c["count"])].append(c)
+    pool = [min(v, key=lambda c: c["coh"]) for v in by_pair.values()]
     if not pool:
         return [], {"error": "no candidates"}
 
@@ -132,26 +139,35 @@ def solve(cands, counts, per_count, quota, iters=60, w_cell=900, w_row=260, w_co
     N = T + 1
 
     def build(penalty):
+        """The network, plus the window each pair is representing at this penalty.
+
+        Returned together on purpose: the edge cost and the window it was priced from
+        must not be able to drift apart, and they would if the representative were
+        recomputed at extraction time against a penalty that had since moved on.
+        """
         f = MCMF(N)
+        rep = {}
         for i, k in enumerate(kinds):
             f.add(S, K0 + i, quota[k], 0)
         for m in matches:
             f.add(K0 + kinds.index(kind_of[m]), M0 + m_idx[m], 1, 0)
         for (m, cnt) in pairs:
-            c = best[(m, cnt)]
-            cost = int(round(1000 * c["coh"] + penalty(c)))
-            f.add(M0 + m_idx[m], P0 + p_idx[(m, cnt)], 1, cost)
+            def priced(c):
+                return 1000 * c["coh"] + penalty(c)
+            c = min(by_pair[(m, cnt)], key=priced)
+            rep[(m, cnt)] = c
+            f.add(M0 + m_idx[m], P0 + p_idx[(m, cnt)], 1, int(round(priced(c))))
             f.add(P0 + p_idx[(m, cnt)], C0 + c_idx[cnt], 1, 0)
         for cnt in counts:
             f.add(C0 + c_idx[cnt], T, per_count, 0)
-        return f
+        return f, rep
 
-    def extract(f):
+    def extract(f, rep):
         out = []
         for (m, cnt) in pairs:
             for e in f.g[M0 + m_idx[m]]:
                 if e[0] == P0 + p_idx[(m, cnt)] and e[1] == 0:
-                    out.append(best[(m, cnt)])
+                    out.append(rep[(m, cnt)])
         return out
 
     def spread_cost(sel):
@@ -164,35 +180,51 @@ def solve(cands, counts, per_count, quota, iters=60, w_cell=900, w_row=260, w_co
         return dup * 3.0 + rvar * 0.25 + cvar * 0.12
 
     def objective(sel):
-        return sum(c["coh"] for c in sel) / len(sel) + 0.06 * spread_cost(sel)
+        return sum(c["coh"] for c in sel) / len(sel) + w_obj * spread_cost(sel)
 
-    f = build(lambda c: 0)
+    f, rep = build(lambda c: 0)
     flow, _ = f.run(S, T)
-    sel = extract(f)
+    sel = extract(f, rep)
     if flow < target:
         return [], _diagnose(pool, counts, per_count, quota, flow, target)
 
     best_sel, best_obj = sel, objective(sel)
-    cell_u = collections.Counter(c["cell"] for c in sel)
-    row_u = collections.Counter(_row_col(c["cell"])[0] for c in sel)
-    col_u = collections.Counter(_row_col(c["cell"])[1] for c in sel)
+    # Lagrange multipliers, ACCUMULATED across iterations rather than recomputed from the
+    # last solution alone. Recomputing made the search oscillate instead of converge: the
+    # penalty only charges for rows the previous solution over-used, so a solution sitting
+    # in rows B/C/D priced those three out and the next one fled wholesale to A/E/F, which
+    # priced THOSE out and sent it back. Two extremes, alternating, neither balanced —
+    # measured on this pool as {B:7, C:8, D:9} against {A:6, B:7, E:9, F:2}. Accumulating
+    # the excess makes the pressure on a row reflect how persistently it has been crowded,
+    # so rows that are merely popular settle at their fair share instead of being expelled.
+    lam_cell = collections.Counter()
+    lam_row = collections.Counter()
+    lam_col = collections.Counter()
+    row_share, col_share = target / 6.0, target / 16.0
     for it in range(iters):
-        def penalty(c, cu=cell_u, ru=row_u, lu=col_u):
+        for c in sel:
             r, l = _row_col(c["cell"])
-            return (w_cell * max(0, cu[c["cell"]] - 1)
-                    + w_row * max(0, ru[r] - target // 6)
-                    + w_col * max(0, lu[l] - max(1, target // 16)))
-        f = build(penalty)
+            lam_cell[c["cell"]] += 1
+            lam_row[r] += 1
+            lam_col[l] += 1
+        # Subgradient step: charge only the EXCESS over a fair share, and let the step
+        # shrink as it goes so late iterations refine rather than overshoot.
+        step = w_step / (it + 1)
+
+        def penalty(c, s=step):
+            r, l = _row_col(c["cell"])
+            n = it + 1
+            return s * (w_cell * max(0.0, lam_cell[c["cell"]] - n * 1.0)
+                        + w_row * max(0.0, lam_row[r] - n * row_share)
+                        + w_col * max(0.0, lam_col[l] - n * col_share))
+        f, rep = build(penalty)
         flow, _ = f.run(S, T)
         if flow < target:
             break
-        sel = extract(f)
+        sel = extract(f, rep)
         obj = objective(sel)
         if obj < best_obj:
             best_sel, best_obj = sel, obj
-        cell_u = collections.Counter(c["cell"] for c in sel)
-        row_u = collections.Counter(_row_col(c["cell"])[0] for c in sel)
-        col_u = collections.Counter(_row_col(c["cell"])[1] for c in sel)
     if verbose:
         print(f"  assignment: {len(best_sel)} clips, mean coherence "
               f"{sum(c['coh'] for c in best_sel)/len(best_sel):.3f}, "
