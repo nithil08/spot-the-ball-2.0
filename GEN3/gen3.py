@@ -346,32 +346,35 @@ def probe_match(p):
     them to locate the ball. They are deleted as soon as that runs.
     """
     off = (p["offset_x"], p["offset_y"])
-    end = max(w["end"] for w in p["windows"])
     lvl = f"g3_{p['shape']}"
-    plate, _ = G.render_window(lvl, p["seed"], 0, end,
-                               hide_slots=",".join(G.ALL_SLOTS), offset=off)
-    plate = np.array(plate, dtype=np.int16)
-    small = plate[:, ::DOWN, ::DOWN]
-    on = np.zeros((len(G.ALL_SLOTS), len(plate)), dtype=bool)
+    # Only the candidate END frames are ever read — the count is a property of the last
+    # frame of a clip. Keeping the whole replay would cost ~10 GB on a corner match.
+    ends = sorted({w["end"] - 1 for w in p["windows"]})
+    keep = set(ends)
+    end = max(ends) + 1
+
+    plate_full, _ = G.render_window(lvl, p["seed"], 0, end, keep=keep,
+                                    hide_slots=",".join(G.ALL_SLOTS), offset=off)
+    plate_full = np.array(plate_full, dtype=np.uint8)          # (len(ends), H, W, 3)
+    small = plate_full[:, ::DOWN, ::DOWN].astype(np.int16)
+
+    on = np.zeros((len(G.ALL_SLOTS), len(ends)), dtype=bool)
     for si, slot in enumerate(G.ALL_SLOTS):
         hide = ",".join(s for s in G.ALL_SLOTS if s != slot)          # show ONLY this one
-        solo, _ = G.render_window(lvl, p["seed"], 0, end, hide_slots=hide, offset=off)
-        solo = np.array(solo, dtype=np.int16)[:, ::DOWN, ::DOWN]
+        solo, _ = G.render_window(lvl, p["seed"], 0, end, keep=keep, down=DOWN,
+                                  hide_slots=hide, offset=off)
+        solo = np.array(solo, dtype=np.int16)
         d = np.abs(solo - small).sum(axis=3)
-        on[si] = (d > 30).reshape(len(small), -1).sum(axis=1) > MIN_PIX
+        on[si] = (d > 30).reshape(len(ends), -1).sum(axis=1) > MIN_PIX
+
     COUNTS.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(COUNTS / f"{p['match']}.npz", on=on)
-    # Only the candidate end frames are needed by the ball-pixel pass; keeping the whole
-    # plate would be ~1.3 GB per match.
-    ends = sorted({w["end"] - 1 for w in p["windows"]})
+    np.savez_compressed(COUNTS / f"{p['match']}.npz", on=on, ends=np.array(ends))
     PLATES.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(PLATES / f"{p['match']}.npz",
-                        frames=plate[ends].astype(np.uint8), ends=np.array(ends))
-    tot = on.sum(axis=0)
-    at_ends = [int(on[:, e].sum()) for e in ends]
+    np.savez_compressed(PLATES / f"{p['match']}.npz", frames=plate_full,
+                        ends=np.array(ends))
+    at_ends = on.sum(axis=0)
     print(f"  [probe] {p['match']} off=({off[0]:+.0f},{off[1]:+.0f}) "
-          f"in-frame {int(tot.min())}-{int(tot.max())}, "
-          f"end counts {sorted(set(at_ends))}", flush=True)
+          f"{len(ends)} end frames, counts {sorted(set(map(int, at_ends)))}", flush=True)
 
 
 def cmd_probe(argv):
@@ -445,11 +448,15 @@ def _pool():
         if not (cf.exists() and pf.exists()):
             skipped += 1
             continue
-        on = np.load(cf)["on"]
+        z = np.load(cf)
+        on = z["on"]
+        # `on` is indexed by POSITION in the probed end-frame list, not by frame number:
+        # the probe only measures the frames a clip could actually end on.
+        at = {int(f): i for i, f in enumerate(z["ends"])}
         pix = json.loads(pf.read_text())
         for w in p["windows"]:
             e = w["end"] - 1
-            if e >= on.shape[1] or str(e) not in pix:
+            if e not in at or str(e) not in pix:
                 continue
             px, py = pix[str(e)]
             pool.append({"match": p["match"], "shape": p["shape"], "seed": p["seed"],
@@ -458,7 +465,7 @@ def _pool():
                          "anchor": w["anchor"], "coh": w["coh"],
                          "loose": w["loose"], "apex": w["apex"], "dnear": w["dnear"],
                          "path": w["path"],
-                         "count": int(on[:, e].sum()),
+                         "count": int(on[:, at[e]].sum()),
                          "px": px, "py": py, "cell": cell_of(px, py)})
     return pool, skipped
 

@@ -290,11 +290,22 @@ def run_log(level, seed, steps, offset=(0.0, 0.0)):
             "left": np.array(lt), "right": np.array(rt), "score": np.array(sc)}
 
 
-def render_window(level, seed, start, end, hide_slots="", offset=(0.0, 0.0)):
+def render_window(level, seed, start, end, hide_slots="", offset=(0.0, 0.0),
+                  keep=None, down=1):
     """Replay and keep frames [start, end). Returns (frames, ball_xy).
 
     Hiding is render-only (renderScale), so the hidden set never changes the play — which
     is what lets the solo probe count players without perturbing what it is counting.
+
+    `keep` and `down` exist for the probe, and they are not an optimisation — without them
+    it does not run at all. A probe replays to the last candidate frame, which for a corner
+    is up to 2750, and holding that many 480x1280x3 frames costs ~5 GB as uint8 and ~10 GB
+    once stacked as int16 for the diff. Six shards of that take the machine down.
+
+    The probe only ever reads the CANDIDATE END FRAMES — at most a few dozen per match —
+    so it passes `keep` (the frame indices it wants) and `down=2`. Everything else is
+    rendered, because the engine renders every step regardless, and simply dropped.
+    Memory falls to tens of megabytes with no change in replay cost.
     """
     _prep(hide_slots, offset)
     env = _env(level, seed, CACHE / "_work_render")
@@ -304,9 +315,9 @@ def render_window(level, seed, start, end, hide_slots="", offset=(0.0, 0.0)):
     for i in range(end):
         obs, _r, done, _i = env.step([])
         o = obs[0] if isinstance(obs, list) else obs
-        if i >= start:
+        if i >= start and (keep is None or i in keep):
             f = np.asarray(env.render("rgb_array"))[HUD_TOP:FRAME_H - HUD_BOT, :]
-            frames.append(f)
+            frames.append(f[::down, ::down] if down > 1 else f)
             balls.append(np.asarray(o["ball"][:2], dtype=float))
         if done:
             break
