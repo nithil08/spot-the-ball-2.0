@@ -533,7 +533,7 @@ DETECTORS = {"corner": find_corners, "kickoff": find_kickoffs, "gk_throw": find_
 
 
 # ── composition: the two visibility variants from one render pair ───────────────
-def compose_pair(vis, inv):
+def compose_pair(vis, inv, final_fallback=None):
     """(full_visibility_frames, split_frames), grid burned in and a red circle on the
     ball's START position for the first MARK_FRAMES frames.
 
@@ -542,11 +542,39 @@ def compose_pair(vis, inv):
 
     Returns the measured start/final ball pixels too: those come from THIS render pair,
     the one that actually ships, so the ground truth cannot drift from the video.
+
+    Unlike the plate pair in `ballpix`, THESE renders have all 22 players in them, so a
+    player standing in front of the ball makes the visible and invisible frames identical
+    right there and the ball measures as absent. Two different fallbacks, because the two
+    frames are not the same kind of thing:
+
+    * The start frame only positions the red marker, and the marker is drawn over the
+      whole first MARK_FRAMES anyway — so take the first frame in that span where the
+      ball can be seen. It is at most MARK_FRAMES/FPS of travel from frame 0.
+    * The final frame is THE ANSWER, so it cannot slide to a neighbouring frame. Use
+      `final_fallback`: the plate measurement of this exact frame at this exact offset,
+      taken with every player hidden and therefore not occludable.
     """
-    from grid import build_grid, burn_grid, circle_ball, detect_ball
+    from grid import build_grid, burn_grid, circle_ball, detect_ball_or_none
     overlay = build_grid()
-    spx, spy = detect_ball(vis[0], inv[0])
-    fpx, fpy = detect_ball(vis[-1], inv[-1])
+    start = None
+    for i in range(min(MARK_FRAMES, len(vis))):
+        start = detect_ball_or_none(vis[i], inv[i])
+        if start is not None:
+            break
+    if start is None:
+        raise ValueError(
+            f"no ball in any of the first {MARK_FRAMES} frames — nothing to mark")
+    spx, spy = start
+    final = detect_ball_or_none(vis[-1], inv[-1])
+    if final is None:
+        if final_fallback is None:
+            raise ValueError("no ball on the final frame and no plate measurement to "
+                             "fall back on — this clip has no answer")
+        final = final_fallback
+        print("    final frame: ball occluded in the shipped render, using the plate "
+              f"measurement {final_fallback}", flush=True)
+    fpx, fpy = final
 
     def finish(seq):
         out = []

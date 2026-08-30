@@ -404,8 +404,14 @@ def cmd_ballpix(argv):
 
     Ground truth is still re-measured from the real shipped render in cmd_compose; this
     exists so SELECTION can see each candidate's grid cell before committing.
+
+    An end frame whose ball cannot be located is DROPPED, not fatal. With every player
+    hidden nothing can occlude the ball, so the only way to lose it is for the camera
+    offset to have pushed it out of shot — at +-24 px of reframing that happens, and such
+    a window has no answer cell and must not ship. `_pool` already skips ends missing
+    from this file, so dropping them here is all the exclusion that is needed.
     """
-    from grid import detect_ball
+    from grid import detect_ball_or_none
     from lib import use_bundle
     from scenario_factory import write_scenario
     shard_i, shard_n = parse_shard(argv)
@@ -425,13 +431,17 @@ def cmd_ballpix(argv):
     vis_plate, ends = z["frames"], list(map(int, z["ends"]))
     inv, _ = G.render_window(f"g3_{p['shape']}", p["seed"], 0, max(ends) + 1,
                              hide_slots=",".join(G.ALL_SLOTS), offset=off)
-    out = {}
+    out, offscreen = {}, 0
     for i, e in enumerate(ends):
-        px, py = detect_ball(vis_plate[i], np.asarray(inv[e]))
-        out[str(e)] = [round(float(px), 1), round(float(py), 1)]
+        found = detect_ball_or_none(vis_plate[i], np.asarray(inv[e]))
+        if found is None:
+            offscreen += 1
+            continue
+        out[str(e)] = [round(float(found[0]), 1), round(float(found[1]), 1)]
     (PIX / f"{p['match']}.json").write_text(json.dumps(out))
     (PLATES / f"{p['match']}.npz").unlink()
-    print(f"  [ballpix] {p['match']}: {len(out)} end frames, cells "
+    print(f"  [ballpix] {p['match']}: {len(out)} end frames"
+          f"{f' ({offscreen} dropped, ball off screen)' if offscreen else ''}, cells "
           f"{sorted({cell_of(*v) for v in out.values()})}", flush=True)
     return 0
 
@@ -544,7 +554,10 @@ def cmd_compose(argv):
     for p in picks:
         vis = np.load(RENDERS / f"{p['clip']}_vis.npz")["frames"]
         inv = np.load(RENDERS / f"{p['clip']}_inv.npz")["frames"]
-        full, split, (spx, spy), (fpx, fpy) = G.compose_pair(vis, inv)
+        # The plate measurement of this clip's own final frame, at its own offset: the
+        # ground truth when a player is standing in front of the ball on that frame.
+        full, split, (spx, spy), (fpx, fpy) = G.compose_pair(
+            vis, inv, final_fallback=(p["px"], p["py"]))
         G.write_clip(full, G.OUT / "full_visibility" / f"{p['clip']}.mov")
         G.write_clip(split, G.OUT / "split_1s_4s" / f"{p['clip']}.mov")
         p["final_cell_measured"] = G.cell_of(fpx, fpy)

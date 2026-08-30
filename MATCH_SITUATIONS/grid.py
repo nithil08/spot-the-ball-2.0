@@ -74,11 +74,19 @@ def circle_ball(frame_rgb, px, py):
     return np.array(img)
 
 
-def detect_ball(vis, inv):
-    """Ball centre in pixels, from the visible-vs-invisible pixel difference."""
+def detect_ball_or_none(vis, inv, thr_floor=40):
+    """Ball centre in pixels, or None when the ball is not in this frame.
+
+    None is a real answer, not an error: the camera can be reframed far enough that the
+    ball leaves the shot, and in a render where players are visible a body standing in
+    front of the ball makes the visible and invisible frames identical right there. Both
+    show up the same way — no differing pixels to average — so callers that can drop the
+    frame should use this, and only callers for which a missing ball is fatal should use
+    `detect_ball`.
+    """
     import numpy as np
     d = np.abs(vis.astype(np.int16) - inv.astype(np.int16)).sum(axis=2)
-    thr = max(40, d.max() * 0.35)
+    thr = max(thr_floor, d.max() * 0.35)
     mask = d > thr
     if mask.sum() == 0:
         mask = d > (d.max() * 0.5)
@@ -88,4 +96,21 @@ def detect_ball(vis, inv):
         ballmask = mask
     ys, xs = np.nonzero(ballmask)
     w = d[ys, xs].astype(float)
+    if w.sum() <= 0:                       # nothing differs: no ball to weight by
+        return None
     return float(np.average(xs, weights=w)), float(np.average(ys, weights=w))
+
+
+def detect_ball(vis, inv):
+    """Ball centre in pixels, from the visible-vs-invisible pixel difference.
+
+    Raises when the ball is not on screen — dividing by a zero difference mass used to
+    surface as a bare ZeroDivisionError from inside numpy, which says nothing about what
+    went wrong.
+    """
+    p = detect_ball_or_none(vis, inv)
+    if p is None:
+        raise ValueError(
+            "no ball pixels: the visible and invisible frames are identical, so the "
+            "ball is off screen or hidden behind a player in this frame")
+    return p
