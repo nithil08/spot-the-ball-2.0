@@ -54,7 +54,12 @@ SWEEP_STEPS = 2750                     # ~110 s of match, matching the GEN2 swee
 # are still accelerating out of their scenario placement and it does not read as live play.
 # Kick-off windows are exempt by construction — that IS the restart.
 SKIP_START = 25
-SLIDE = {"corner": 30, "kickoff": 30, "gk_throw": 30, "open": 10_000}
+# A restart clip has to SHOW its restart, so its window can only slide so far before
+# the delivery falls out of the opening seconds. 50 frames at 25 fps puts the latest
+# delivery 2 s into a 5 s clip, which still reads unmistakably as a corner or a
+# kick-off — and every extra slide position is another player count that scarce match
+# can offer, which is what makes 5 corners reachable at all.
+SLIDE = {"corner": 50, "kickoff": 50, "gk_throw": 50, "open": 10_000}
 STRIDE = 5
 
 CAND = G.CACHE / "shortlist.json"
@@ -197,15 +202,23 @@ def _candidates(log, kind, n):
 MAX_WINDOWS, MIN_SEP = 40, 25
 
 
-def _spread(cands):
-    """The best windows by coherence, but forced apart in TIME.
+def _spread(cands, kind):
+    """The best windows by coherence, but for open play, forced apart in TIME.
 
-    Taking the top 40 outright would cluster them on one passage of play, and every window
-    in a cluster ends on nearly the same frame — so they would all measure nearly the same
-    player count, which is precisely the freedom this list exists to provide. Requiring
-    MIN_SEP frames between kept windows buys a spread of end frames, and therefore a
-    spread of counts, at a negligible cost in coherence.
+    Open play has hundreds of anchors per match, and taking the top 40 outright would
+    cluster them on one passage — every window in a cluster ends on nearly the same frame,
+    so they all measure nearly the same player count, which is exactly the freedom this
+    list exists to provide. MIN_SEP buys a spread of end frames for a negligible coherence
+    cost.
+
+    A RESTART CLASS IS THE OPPOSITE CASE and must not be thinned. Its windows are the
+    slide positions around one anchor, only SLIDE frames apart by construction, so a 25
+    frame separation rule would discard all but two of the seven — and for corners, which
+    run about one usable match in eighty, those slide positions are the only count
+    flexibility that match will ever offer.
     """
+    if kind != "open":
+        return sorted(cands, key=lambda r: r["coh"])[:MAX_WINDOWS]
     kept = []
     for c in sorted(cands, key=lambda r: r["coh"]):
         if all(abs(c["start"] - k["start"]) >= MIN_SEP for k in kept):
@@ -237,7 +250,7 @@ def cmd_shortlist(argv):
             if not cands:
                 continue
             rows.append({"match": t, "shape": shape, "seed": int(seed), "kind": kind,
-                         "windows": _spread(cands)})
+                         "windows": _spread(cands, kind)})
             tally[kind] += 1
             break                      # one class per match, scarcity-first
     G.CACHE.mkdir(parents=True, exist_ok=True)
@@ -270,13 +283,20 @@ OFFY_SCHEDULE = [0.0, 6.0, -5.0, 10.0, -9.0, 3.0, -2.0, 8.0, -7.0]
 # never the binding constraint.
 PROBE_BUDGET = {"corner": 999, "gk_throw": 18, "kickoff": 16, "open": 26}
 MAX_END = 1900             # cap the probe replay length; cost is linear in the end frame
+SCARCE = ("corner", "gk_throw")   # exempt from MAX_END — too few of them to discard any
 
 
 def cmd_plan(argv):
     rows = json.loads(CAND.read_text())
     by_kind = {k: [] for k in CLASS_ORDER}
     for r in rows:
-        w = [x for x in r["windows"] if x["end"] <= MAX_END]
+        # MAX_END caps how far the probe has to replay, and cost is linear in the end
+        # frame. But corners are uniformly spread over the 2750-frame sweep, so applying
+        # the cap to them throws away roughly a third of the few that exist. The scarce
+        # classes therefore pay the longer replay; only open play, which has hundreds of
+        # candidates per match, is capped.
+        w = (r["windows"] if r["kind"] in SCARCE
+             else [x for x in r["windows"] if x["end"] <= MAX_END])
         if not w:
             continue
         by_kind[r["kind"]].append({**r, "windows": w})
