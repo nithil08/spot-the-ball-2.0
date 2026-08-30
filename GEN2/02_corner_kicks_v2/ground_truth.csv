@@ -1,6 +1,6 @@
-clip,shape,seed,match,start_frame,end_frame,n_frames,fps,seconds,start_px,start_py,final_px,final_py,min_onscreen,med_onscreen,apex,slid_frames
-corner_kick_01,pressR2,98,pressR2_s098,2183,2308,125,25,5.0,524.2,105.7,590.0,169.1,18,22,2.87,31
-corner_kick_02,flankL,62,flankL_s062,1244,1369,125,25,5.0,497.2,138.6,430.0,212.0,14,18,2.87,40
-corner_kick_03,flankL,66,flankL_s066,1524,1649,125,25,5.0,499.0,141.2,442.2,366.3,14,17,2.87,38
-corner_kick_04,boxL,63,boxL_s063,106,231,125,25,5.0,755.3,88.2,789.9,203.4,12,17,2.87,26
-corner_kick_05,boxL,69,boxL_s069,1740,1865,125,25,5.0,750.5,76.1,664.9,181.7,10,13,2.87,22
+clip,shape,seed,match,start_frame,end_frame,n_frames,fps,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,min_onscreen,med_onscreen,apex,slid_frames
+corner_kick_01,pressR2,98,pressR2_s098,2183,2308,125,25,5.0,B7,524.2,105.7,C8,590.0,169.1,18,22,2.87,31
+corner_kick_02,flankL,62,flankL_s062,1244,1369,125,25,5.0,B7,497.2,138.6,C6,430.0,212.0,14,18,2.87,40
+corner_kick_03,flankL,66,flankL_s066,1524,1649,125,25,5.0,B7,499.0,141.2,E6,442.2,366.3,14,17,2.87,38
+corner_kick_04,boxL,63,boxL_s063,106,231,125,25,5.0,B10,755.3,88.2,C10,789.9,203.4,12,17,2.87,26
+corner_kick_05,boxL,69,boxL_s069,1740,1865,125,25,5.0,A10,750.5,76.1,C9,664.9,181.7,10,13,2.87,22

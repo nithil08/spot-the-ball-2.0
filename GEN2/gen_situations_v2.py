@@ -348,10 +348,13 @@ def phase_compose(kind):
     stem = KINDS[kind]["stem"]
     with open(out / "ground_truth.csv", "w", newline="") as fh:
         w = csv.writer(fh)
+        # ball_final_cell is THE ANSWER for the spot-the-ball task, so it ships as a
+        # grid cell and not only as pixels — that is the form the task is scored in.
         w.writerow(["clip", "shape", "seed", "match", "start_frame", "end_frame",
-                    "n_frames", "fps", "seconds", "start_px", "start_py",
-                    "final_px", "final_py", "min_onscreen", "med_onscreen",
-                    "detail", "slid_frames"])
+                    "n_frames", "fps", "seconds", "ball_start_cell", "start_px",
+                    "start_py", "ball_final_cell", "final_px", "final_py",
+                    "min_onscreen", "med_onscreen", "detail", "slid_frames"])
+        from grid import cell_of
         for i, r in enumerate(kept, 1):
             name = f"{stem}_{i:02d}"
             full, split, (spx, spy), (fpx, fpy) = compose(r["vis"], r["inv"])
@@ -361,7 +364,8 @@ def phase_compose(kind):
                           fps=FPS, crop_hud=False)
             w.writerow([name, r["shape"], r["seed"], r["match"], r["start"], r["end"],
                         CLIP_FRAMES, FPS, round(CLIP_FRAMES / FPS, 2),
-                        round(spx, 1), round(spy, 1), round(fpx, 1), round(fpy, 1),
+                        cell_of(spx, spy), round(spx, 1), round(spy, 1),
+                        cell_of(fpx, fpy), round(fpx, 1), round(fpy, 1),
                         r["min_onscreen"], r["med_onscreen"], r["detail"],
                         r["offset"]])
             print(f"wrote {name}: min on screen {r['min_onscreen']}, slid +{r['offset']}")

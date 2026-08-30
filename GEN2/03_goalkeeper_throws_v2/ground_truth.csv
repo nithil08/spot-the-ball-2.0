@@ -1,0 +1,11 @@
+clip,shape,seed,match,start_frame,end_frame,n_frames,fps,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,min_onscreen,med_onscreen,detail,slid_frames
+goalkeeper_throw_01,pressL,91,pressL_s091,1242,1367,125,25,5.0,C12,948.0,161.6,C12,950.4,173.5,15,18,0.314,31
+goalkeeper_throw_02,flankL,81,flankL_s081,1883,2008,125,25,5.0,C6,417.5,187.5,C6,420.7,217.8,14,19,0.278,0
+goalkeeper_throw_03,pressR2,90,pressR2_s090,2164,2289,125,25,5.0,B5,327.5,147.8,C6,465.2,188.8,13,20,0.211,0
+goalkeeper_throw_04,flankL,94,flankL_s094,2384,2509,125,25,5.0,C12,883.9,163.8,C10,724.5,189.3,12,15,0.214,0
+goalkeeper_throw_05,pressR2,67,pressR2_s067,2594,2719,125,25,5.0,C13,970.2,176.0,B12,945.6,150.7,12,17,0.302,2
+goalkeeper_throw_06,pressL,88,pressL_s088,557,682,125,25,5.0,C4,319.4,175.7,C5,339.0,227.4,12,19,0.302,0
+goalkeeper_throw_07,pressL,66,pressL_s066,670,795,125,25,5.0,B12,901.2,150.3,C11,835.5,201.5,12,19,0.365,0
+goalkeeper_throw_08,pressL,98,pressL_s098,2110,2235,125,25,5.0,C12,916.5,238.4,C10,770.8,190.2,12,16,0.321,0
+goalkeeper_throw_09,pressL,80,pressL_s080,2150,2275,125,25,5.0,C12,909.3,170.9,B11,847.4,123.6,11,17,0.245,0
+goalkeeper_throw_10,boxL,82,boxL_s082,2269,2394,125,25,5.0,B12,950.4,151.3,C10,793.1,176.8,10,17,0.266,0

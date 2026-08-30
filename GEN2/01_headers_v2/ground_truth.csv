@@ -1,0 +1,11 @@
+clip,shape,seed,match,start_frame,end_frame,n_frames,fps,seconds,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py,min_onscreen,med_onscreen,detail,slid_frames
+header_01,pressL,85,pressL_s085,1315,1440,125,25,5.0,B9,693.0,151.0,B8,606.3,135.3,20,27,1.5,0
+header_02,boxL,91,boxL_s091,1899,2024,125,25,5.0,B9,669.8,131.5,C7,542.6,179.0,18,24,1.46,35
+header_03,pressL,69,pressL_s069,2616,2741,125,25,5.0,B9,654.0,113.1,C9,694.1,175.1,16,20,1.5,7
+header_04,pressL,90,pressL_s090,893,1018,125,25,5.0,C9,709.6,186.9,B9,666.2,127.5,16,24,2.01,2
+header_05,pressR2,87,pressR2_s087,428,553,125,25,5.0,B8,573.2,100.1,B8,571.0,156.5,16,23,1.43,47
+header_06,pressR2,81,pressR2_s081,1345,1470,125,25,5.0,D6,469.0,271.3,C6,458.3,219.7,14,20,1.4,0
+header_07,flankL,79,flankL_s079,1573,1698,125,25,5.0,B9,652.9,93.3,C9,700.3,170.4,14,21,1.38,42
+header_08,pressL,64,pressL_s064,2529,2654,125,25,5.0,C9,681.9,176.9,C8,573.9,191.8,12,20,1.87,0
+header_09,pressR2,70,pressR2_s070,1302,1427,125,25,5.0,B10,739.9,119.7,C11,821.8,203.7,10,25,1.85,48
+header_10,boxL,88,boxL_s088,287,412,125,25,5.0,A8,630.6,77.2,C9,701.8,192.5,10,17,1.54,9
