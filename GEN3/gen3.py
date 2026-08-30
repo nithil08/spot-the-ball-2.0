@@ -68,6 +68,7 @@ PLAN = G.CACHE / "plan.json"
 COUNTS = G.CACHE / "counts"
 PICKS = G.CACHE / "picks.json"
 RENDERS = G.CACHE / "renders"
+ABSENT = G.CACHE / "ball_absent.json"     # {match: [[lo, hi], ...]} — see cmd_audit
 
 # ── camera calibration (measured; see data/code/gen_30_spread_code.py) ──────────
 KX = -26.58                 # px per world unit of offset X, linear over the whole range
@@ -452,12 +453,14 @@ def _pool():
     import gen3_assign                                                # noqa: F401
     plan = json.loads(PLAN.read_text())
     PIX = G.CACHE / "ballpix"
-    pool, skipped = [], 0
+    absent = json.loads(ABSENT.read_text()) if ABSENT.exists() else {}
+    pool, skipped, blocked = [], 0, 0
     for p in plan:
         cf, pf = COUNTS / f"{p['match']}.npz", PIX / f"{p['match']}.json"
         if not (cf.exists() and pf.exists()):
             skipped += 1
             continue
+        gone = absent.get(p["match"], [])
         z = np.load(cf)
         on = z["on"]
         # `on` is indexed by POSITION in the probed end-frame list, not by frame number:
@@ -468,6 +471,13 @@ def _pool():
             e = w["end"] - 1
             if e not in at or str(e) not in pix:
                 continue
+            # The audit measures which frames of a match actually show the ball, and a
+            # window is dead if either END of it lands on one that does not: the red
+            # start-circle would have nothing to mark, or the answer would be unreadable
+            # on the frame it is read from.
+            if any(lo <= f <= hi for lo, hi in gone for f in (w["start"], e)):
+                blocked += 1
+                continue
             px, py = pix[str(e)]
             pool.append({"match": p["match"], "shape": p["shape"], "seed": p["seed"],
                          "kind": p["kind"], "offset_x": p["offset_x"],
@@ -477,6 +487,8 @@ def _pool():
                          "path": w["path"],
                          "count": int(on[:, at[e]].sum()),
                          "px": px, "py": py, "cell": cell_of(px, py)})
+    if blocked:
+        print(f"  {blocked} windows excluded: the audit measured no ball at their start")
     return pool, skipped
 
 
@@ -508,6 +520,19 @@ def cmd_select(argv):
 
 
 # ══ phase 7: render — vis and inv, nobody hidden ═══════════════════════════════
+def rkey(p):
+    """Cache key for a render: the WINDOW, never the clip number.
+
+    Clip numbers are positions in a sorted picks list, so re-running `select` after the
+    audit rejects a window renumbers everything after it. Keyed by clip number, the
+    already-rendered frames of one window would then be served up as another window's —
+    silently, since a .npz of the right shape exists at the expected path. Keyed by the
+    window itself, a re-selection reuses exactly the renders that are still valid and
+    re-renders exactly the ones that changed.
+    """
+    return f"{p['match']}_{p['start']}_{p['end']}"
+
+
 def _render(bundle, tag_, shard_i, shard_n):
     from lib import use_bundle
     from scenario_factory import write_scenario
@@ -518,7 +543,7 @@ def _render(bundle, tag_, shard_i, shard_n):
     RENDERS.mkdir(parents=True, exist_ok=True)
     todo = [p for i, p in enumerate(picks)
             if i % shard_n == shard_i
-            and not (RENDERS / f"{p['clip']}_{tag_}.npz").exists()]
+            and not (RENDERS / f"{rkey(p)}_{tag_}.npz").exists()]
     if not todo:
         return EXIT_DONE
     for p in todo[:4]:
@@ -526,7 +551,7 @@ def _render(bundle, tag_, shard_i, shard_n):
         frames, _ = G.render_window(f"g3_{p['shape']}", p["seed"], p["start"], p["end"],
                                     hide_slots="",
                                     offset=(p["offset_x"], p["offset_y"]))
-        np.savez_compressed(RENDERS / f"{p['clip']}_{tag_}.npz",
+        np.savez_compressed(RENDERS / f"{rkey(p)}_{tag_}.npz",
                             frames=np.array(frames, dtype=np.uint8))
         print(f"  [{tag_}] {p['clip']} {p['match']} ({len(frames)} frames)", flush=True)
     return 0
@@ -538,6 +563,72 @@ def cmd_render_vis(argv):
 
 def cmd_render_inv(argv):
     return _render(G.BUNDLE_INV, "inv", *parse_shard(argv))
+
+
+# ══ phase 7b: audit — is the ball actually in the clip we rendered? ════════════
+MIN_BALL_PX = 3            # matches GEN2's ball_onscreen: fewer than 3 changed pixels is
+                           # not a ball you can read, it is the sliver left round a body
+
+
+def _ball_px(vis_f, inv_f):
+    """Changed pixels between the two passes of one frame — i.e. how much ball is showing."""
+    d = np.abs(vis_f.astype(np.int16) - inv_f.astype(np.int16)).sum(axis=2)
+    return int((d > 40).sum())
+
+
+def cmd_audit(argv):
+    """Reject any picked window that does not hold the ball at BOTH of its ends.
+
+    Both ends, and only the ends — the same rule GEN2 settled on. Those are the two frames
+    ground truth is read from: the red circle marks the first, and the final cell, the
+    answer, is read off the last. Interior frames are deliberately exempt, because the
+    visible and invisible passes are identical wherever a player stands in front of the
+    ball, so a ball going behind a body for half a second measures as absent — and that is
+    just football, not a defect.
+
+    Nothing upstream can do this check. `ballpix` measured only END frames, and it measured
+    them on a PLATE, with all 22 players hidden, so it can see a ball that is out of shot
+    but not one that is behind a defender. This runs on the pair that actually ships, which
+    is both the honest place for it and free: those renders already exist.
+
+    A rejection records the ball-less frames in ABSOLUTE frame numbers, which `_pool` then
+    uses to exclude every window of that match that starts or ends inside one. Re-run
+    `select` and the render phases afterwards: renders are keyed by window, so the ones
+    that survived are reused and only the replacements are rendered.
+
+    Exit 0 = clean, 4 = rejections were recorded and the pipeline must loop.
+    """
+    picks = json.loads(PICKS.read_text())
+    absent = json.loads(ABSENT.read_text()) if ABSENT.exists() else {}
+    rejected = []
+    for p in picks:
+        vis = np.load(RENDERS / f"{rkey(p)}_vis.npz")["frames"]
+        inv = np.load(RENDERS / f"{rkey(p)}_inv.npz")["frames"]
+        spans, why = [], None
+        first = next((i for i in range(len(vis))
+                      if _ball_px(vis[i], inv[i]) >= MIN_BALL_PX), None)
+        if first is None or first >= G.MARK_FRAMES:
+            # No ball at all, or not until frame `first`: that whole opening stretch is
+            # ball-less, so record it rather than only the one frame that was checked.
+            span = len(vis) if first is None else first
+            spans.append([p["start"], p["start"] + span - 1])
+            why = f"no ball for the first {span}/{len(vis)} frames"
+        end_px = _ball_px(vis[-1], inv[-1])
+        if end_px < MIN_BALL_PX:
+            spans.append([p["end"] - 1, p["end"] - 1])
+            why = (why + "; " if why else "") + f"only {end_px} ball px on the final frame"
+        if not spans:
+            continue
+        absent.setdefault(p["match"], []).extend(spans)
+        rejected.append((p["clip"], p["match"], why))
+        for tag_ in ("vis", "inv"):
+            (RENDERS / f"{rkey(p)}_{tag_}.npz").unlink(missing_ok=True)
+    ABSENT.write_text(json.dumps(absent, indent=1))
+    for clip, match, why in rejected:
+        print(f"  rejected {clip} ({match}): {why}")
+    print(f"audit: {len(picks) - len(rejected)}/{len(picks)} clips hold the ball at both "
+          f"ends" + (" — re-run select and the render phases" if rejected else ""))
+    return 4 if rejected else 0
 
 
 # ══ phase 8: compose ═══════════════════════════════════════════════════════════
@@ -552,8 +643,8 @@ def cmd_compose(argv):
     rows = [HEADER]
     G.OUT.mkdir(parents=True, exist_ok=True)
     for p in picks:
-        vis = np.load(RENDERS / f"{p['clip']}_vis.npz")["frames"]
-        inv = np.load(RENDERS / f"{p['clip']}_inv.npz")["frames"]
+        vis = np.load(RENDERS / f"{rkey(p)}_vis.npz")["frames"]
+        inv = np.load(RENDERS / f"{rkey(p)}_inv.npz")["frames"]
         # The plate measurement of this clip's own final frame, at its own offset: the
         # ground truth when a player is standing in front of the ball on that frame.
         full, split, (spx, spy), (fpx, fpy) = G.compose_pair(
@@ -581,7 +672,7 @@ if __name__ == "__main__":
     table = {"sweep": cmd_sweep, "shortlist": cmd_shortlist, "plan": cmd_plan,
              "probe": cmd_probe, "ballpix": cmd_ballpix, "select": cmd_select,
              "render_vis": cmd_render_vis, "render_inv": cmd_render_inv,
-             "compose": cmd_compose}
+             "audit": cmd_audit, "compose": cmd_compose}
     if cmd not in table:
         sys.exit(f"unknown phase {cmd!r}; known: {' '.join(table)}")
     sys.exit(table[cmd](sys.argv[2:]))

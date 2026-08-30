@@ -27,6 +27,11 @@ import gen3_lib as G                                                  # noqa: E4
 
 PICKS = G.CACHE / "picks.json"
 RENDERS = G.CACHE / "renders"
+
+
+def rkey(p):
+    """Renders are cached by WINDOW, not by clip number — see gen3.rkey."""
+    return f"{p['match']}_{p['start']}_{p['end']}"
 REVIEW = HERE / "_review"
 
 PITCH_FLOOR = 0.80          # fraction of the frame that must still be pitch
@@ -80,8 +85,8 @@ def check(picks):
     print("\n== the rendered frames ==")
     green, balldiff, cont = [], [], []
     for p in picks:
-        vis = np.load(RENDERS / f"{p['clip']}_vis.npz")["frames"]
-        inv = np.load(RENDERS / f"{p['clip']}_inv.npz")["frames"]
+        vis = np.load(RENDERS / f"{rkey(p)}_vis.npz")["frames"]
+        inv = np.load(RENDERS / f"{rkey(p)}_inv.npz")["frames"]
         if len(vis) != G.CLIP_FRAMES or len(inv) != G.CLIP_FRAMES:
             fails.append(f"{p['clip']} frame count")
         green.append((green_fraction(vis[-1]), p["clip"]))
@@ -127,7 +132,7 @@ def contact_sheets(picks):
         rows = [p for p in picks if p["kind"] == kind]
         tiles = []
         for p in rows:
-            vis = np.load(RENDERS / f"{p['clip']}_vis.npz")["frames"]
+            vis = np.load(RENDERS / f"{rkey(p)}_vis.npz")["frames"]
             strip = np.concatenate([vis[0], vis[G.CLIP_FRAMES // 2], vis[-1]], axis=1)
             tiles.append((p, strip))
         h, w = tiles[0][1].shape[:2]
