@@ -631,6 +631,65 @@ def cmd_audit(argv):
     return 4 if rejected else 0
 
 
+# ══ phase 7c: trace — the exact count on EVERY frame of a shipped clip ═════════
+TRACE = G.CACHE / "trace"
+
+
+def cmd_trace(argv):
+    """Per-frame, per-player in-frame map across a shipped clip's whole window.
+
+    The batch's headline number is the count on the LAST frame, which is all `probe`
+    measured — it only ever looked at candidate end frames, because measuring every frame
+    of every candidate window in 77 matches would have been absurd. For the 24 windows
+    that actually shipped it is affordable, and it answers the question the end count
+    cannot: how the number of people in shot CHANGES over the five seconds.
+
+    Same solo-probe mechanism as `probe`, and no cheaper one exists — fitting the camera
+    frustum geometrically gets the per-frame count exactly right only 36% of the time, and
+    counting kit-coloured blobs is biased +5.8 because the hoardings are saturated blue and
+    red. Only plate-versus-solo is exact.
+
+    ~23 replays per clip, bounded to 2 clips per process because the engine leaks.
+    """
+    from lib import use_bundle
+    from scenario_factory import write_scenario
+    shard_i, shard_n = parse_shard(argv)
+    use_bundle(G.BUNDLE_VIS)
+    for name, *_ in G.SHAPES:
+        write_scenario(G.shape_spec(name), force=False)
+    picks = json.loads(PICKS.read_text())
+    TRACE.mkdir(parents=True, exist_ok=True)
+    todo = [p for i, p in enumerate(picks)
+            if i % shard_n == shard_i
+            and not (TRACE / f"{rkey(p)}.npz").exists()]
+    if not todo:
+        print(f"shard {shard_i}/{shard_n}: trace complete")
+        return EXIT_DONE
+    print(f"shard {shard_i}/{shard_n}: {len(todo)} clips left", flush=True)
+    for p in todo[:2]:
+        off = (p["offset_x"], p["offset_y"])
+        lvl = f"g3_{p['shape']}"
+        keep = set(range(p["start"], p["end"]))
+        # down=2 throughout: a body is still tens of pixels at half size, and the full-size
+        # window would be 23 passes x 125 frames x 1.8 MB.
+        plate, _ = G.render_window(lvl, p["seed"], 0, p["end"], keep=keep, down=DOWN,
+                                   hide_slots=",".join(G.ALL_SLOTS), offset=off)
+        plate = np.array(plate, dtype=np.int16)
+        on = np.zeros((len(G.ALL_SLOTS), len(plate)), dtype=bool)
+        for si, slot in enumerate(G.ALL_SLOTS):
+            hide = ",".join(s for s in G.ALL_SLOTS if s != slot)      # show ONLY this one
+            solo, _ = G.render_window(lvl, p["seed"], 0, p["end"], keep=keep, down=DOWN,
+                                      hide_slots=hide, offset=off)
+            d = np.abs(np.array(solo, dtype=np.int16) - plate).sum(axis=3)
+            on[si] = (d > 30).reshape(len(plate), -1).sum(axis=1) > MIN_PIX
+        np.savez_compressed(TRACE / f"{rkey(p)}.npz", on=on,
+                            frames=np.arange(p["start"], p["end"]))
+        n = on.sum(axis=0)
+        print(f"  [trace] {p['clip']} {p['match']}: {n[0]} -> {n[-1]} "
+              f"(min {n.min()}, max {n.max()})", flush=True)
+    return 0
+
+
 # ══ phase 8: compose ═══════════════════════════════════════════════════════════
 HEADER = ("clip,situation,players_in_frame_last,players_in_play,players_hidden,"
           "ball_final_cell,final_px,final_py,ball_start_cell,start_px,start_py,"
@@ -672,7 +731,7 @@ if __name__ == "__main__":
     table = {"sweep": cmd_sweep, "shortlist": cmd_shortlist, "plan": cmd_plan,
              "probe": cmd_probe, "ballpix": cmd_ballpix, "select": cmd_select,
              "render_vis": cmd_render_vis, "render_inv": cmd_render_inv,
-             "audit": cmd_audit, "compose": cmd_compose}
+             "audit": cmd_audit, "trace": cmd_trace, "compose": cmd_compose}
     if cmd not in table:
         sys.exit(f"unknown phase {cmd!r}; known: {' '.join(table)}")
     sys.exit(table[cmd](sys.argv[2:]))
