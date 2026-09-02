@@ -378,7 +378,7 @@ def cmd_counts(rows):
     if any(r["count_start"] is None for r in rows):
         sys.exit("counts chart needs the trace probe: run `python3 gen3.py trace`")
     plt, fig = _fig(10, 9)
-    ax = fig.add_axes([0.20, 0.065, 0.755, 0.80])
+    ax = fig.add_axes([0.20, 0.065, 0.755, 0.795])
 
     rows = sorted(rows, key=lambda r: (r["count_end"], r["count_start"]))
     y = np.arange(len(rows))[::-1]
@@ -387,11 +387,24 @@ def cmd_counts(rows):
                 solid_capstyle="round", zorder=1)
         ax.plot([r["count_start"], r["count_end"]], [i, i], color=AXIS, lw=2,
                 solid_capstyle="round", zorder=2)
-        ax.plot(r["count_start"], i, "o", ms=9, mfc=S1, mec=SURFACE, mew=1.6, zorder=3)
-        ax.plot(r["count_end"], i, "o", ms=9, mfc=S2, mec=SURFACE, mew=1.6, zorder=3)
+        # When the two ends coincide the second marker would hide the first entirely and
+        # the row would read as having only a final count. Widen the one underneath so it
+        # shows as a ring: one mark, both colours, still at one x.
+        same = r["count_start"] == r["count_end"]
+        ax.plot(r["count_start"], i, "o", ms=13 if same else 9, mfc=S1, mec=SURFACE,
+                mew=1.6, zorder=3)
+        ax.plot(r["count_end"], i, "o", ms=9, mfc=S2, mec=SURFACE if not same else S2,
+                mew=1.6 if not same else 0, zorder=4)
         lo, hi = sorted((r["count_start"], r["count_end"]))
-        ax.text(lo - 0.42, i, str(lo), va="center", ha="right", fontsize=8, color=INK2)
-        ax.text(hi + 0.42, i, str(hi), va="center", ha="left", fontsize=8, color=INK2)
+        if lo == hi:
+            # One label, not the same number printed either side of a single dot pair.
+            ax.text(hi + 0.42, i, str(hi), va="center", ha="left", fontsize=8,
+                    color=INK2)
+        else:
+            ax.text(lo - 0.42, i, str(lo), va="center", ha="right", fontsize=8,
+                    color=INK2)
+            ax.text(hi + 0.42, i, str(hi), va="center", ha="left", fontsize=8,
+                    color=INK2)
 
     ax.set_yticks(y, [f"{r['clip'].replace('clip_', 'clip ')}   {KIND_NAME[r['kind']]}"
                       for r in rows], fontsize=8.5)
@@ -403,6 +416,8 @@ def cmd_counts(rows):
     hi = max(r["count_max"] for r in rows) + 1.6
     ax.set_xlim(lo, hi)
     ax.set_ylim(-0.8, len(rows) - 0.2)
+    # Whole people only — the default locator offers 7.5 and 12.5, which do not exist.
+    ax.set_xticks(range(int(np.ceil(lo)), int(hi) + 1, 2))
     ax.xaxis.grid(True, color=GRID, lw=0.7)
     ax.set_axisbelow(True)
     ax.tick_params(length=0)
@@ -417,13 +432,15 @@ def cmd_counts(rows):
         plt.Line2D([], [], color=SEQ[0], lw=7, solid_capstyle="round",
                    label="range during the clip"),
     ]
-    leg = ax.legend(handles=handles, loc="lower right", frameon=False, fontsize=8.5,
-                    handletextpad=0.6, borderaxespad=0.8, labelcolor=INK2)
-    leg.set_zorder(6)
+    # Above the plot, not inside it: with 24 rows there is no reliably empty corner, and
+    # in the data area the legend sat on top of the last two clips.
+    ax.legend(handles=handles, ncol=3, loc="lower left", frameon=False, fontsize=8.5,
+              bbox_to_anchor=(0.0, 1.005), handletextpad=0.6, columnspacing=2.4,
+              labelcolor=INK2)
 
-    fig.text(0.055, 0.955, "People in frame: first frame to last",
+    fig.text(0.055, 0.965, "People in frame: first frame to last",
              fontsize=16, color=INK, weight="bold")
-    fig.text(0.055, 0.906,
+    fig.text(0.055, 0.923,
              "GEN3 pilot — exact counts from the 23-pass solo probe at each clip's own "
              "camera offset. Sorted by the final count, which is the batch's level.",
              fontsize=9, color=INK2)
