@@ -597,6 +597,37 @@ def write_clip(frames, path):
     return path
 
 
+def start_possessor(owned_team, start, end):
+    """Which team the clip STARTS with the ball, as 0 (left/blue) or 1 (right/red).
+
+    `owned_team` is the sweep log's per-step possession, -1 while the ball is loose. The
+    observation is appended after each step, so log index i holds the state following step
+    i + 1 and frame f reads at f - 1.
+
+    Three cases, in order, because "who has the ball at the start" is not a single lookup:
+
+      1. Someone owns it on the start frame        -> that team
+      2. The ball is loose there (a pass in flight, a clearance) -> the last team to have
+         owned it, which is who the viewer sees as being in possession of the passage
+      3. Nobody has owned it yet — only possible in the opening frames of a match, which
+         is exactly where the kick-off clips live -> the first team to take it during the
+         clip, i.e. whoever kicks off
+
+    Returns -1 only if the ball is never owned across the whole window, which would make
+    the clip unassignable to a team; callers drop those.
+    """
+    i = max(start - 1, 0)
+    if owned_team[i] >= 0:
+        return int(owned_team[i])
+    before = owned_team[:i]
+    if (before >= 0).any():
+        return int(before[before >= 0][-1])
+    during = owned_team[i:max(end - 1, i + 1)]
+    if (during >= 0).any():
+        return int(during[during >= 0][0])
+    return -1
+
+
 def cell_of(px, py):
     c = min(max(int(px // CELL_W), 0), COLS - 1)
     r = min(max(int(py // CELL_H), 0), ROWS - 1)

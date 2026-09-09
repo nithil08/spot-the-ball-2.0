@@ -76,6 +76,20 @@ def check(picks):
     want("situation quota", kinds == G.SITUATION_QUOTA,
          f"got {kinds} want {G.SITUATION_QUOTA}")
 
+    # Starting team, checked per LEVEL rather than only in total. A 12/12 grand total is
+    # easy to hit while still leaving a level with two blue starts and another with two
+    # red, which is exactly the imbalance this constraint exists to remove.
+    by_count = {}
+    for p in picks:
+        by_count.setdefault(p["count"], []).append(p.get("startown", -1))
+    uneven = {c: v for c, v in by_count.items() if sorted(v) != [0, 1]}
+    want("each count has one blue-start and one red-start clip", not uneven,
+         f"uneven levels {uneven}" if uneven else "")
+    tot = sorted(p.get("startown", -1) for p in picks)
+    want("starting team is 12 blue / 12 red",
+         tot.count(0) == 12 and tot.count(1) == 12,
+         f"got blue {tot.count(0)} red {tot.count(1)}")
+
     matches = {p["match"] for p in picks}
     want("one clip per match", len(matches) == len(picks),
          f"{len(matches)} distinct matches")

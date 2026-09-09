@@ -113,21 +113,32 @@ def solve(cands, counts, per_count, quota, iters=60, w_cell=900, w_row=260, w_co
     # away exactly the diversity the reweighting is trying to find: the pool holds every
     # grid row, yet a match whose count-12 windows include a row-E ball is invisible as a
     # row-E option if its most coherent count-12 window happens to sit in row C.
+    # The pair key carries the STARTING TEAM alongside the count, which is what enforces
+    # "one clip per level starts with each side". Splitting here rather than filtering
+    # afterwards keeps it a hard constraint inside the flow: the count node downstream is
+    # split into (count, team) sinks of capacity one each, so a solution in which both
+    # clips at a level start with the same side is not merely expensive, it is not a
+    # feasible flow at all. Note the team is a property of the WINDOW, not of the match —
+    # a match can supply a blue-start window at count 12 and a red-start one at count 14 —
+    # which is why it belongs in the pair key and not on the match node.
     by_pair = collections.defaultdict(list)
     for c in cands:
-        if c["count"] not in counts:
+        if c["count"] not in counts or c.get("startown", -1) < 0:
             continue
-        by_pair[(c["match"], c["count"])].append(c)
+        by_pair[(c["match"], c["count"], c["startown"])].append(c)
     pool = [min(v, key=lambda c: c["coh"]) for v in by_pair.values()]
     if not pool:
         return [], {"error": "no candidates"}
 
     matches = sorted({c["match"] for c in pool})
     kinds = sorted(quota)
+    teams = (0, 1)
+    per_slot = per_count // len(teams)
     m_idx = {m: i for i, m in enumerate(matches)}
-    c_idx = {c: i for i, c in enumerate(counts)}
+    slots = [(cnt, t) for cnt in counts for t in teams]
+    c_idx = {s: i for i, s in enumerate(slots)}
     kind_of = {c["match"]: c["kind"] for c in pool}
-    pairs = sorted({(c["match"], c["count"]) for c in pool})
+    pairs = sorted({(c["match"], c["count"], c["startown"]) for c in pool})
     p_idx = {p: i for i, p in enumerate(pairs)}
 
     S = 0
@@ -135,7 +146,7 @@ def solve(cands, counts, per_count, quota, iters=60, w_cell=900, w_row=260, w_co
     M0 = K0 + len(kinds)
     P0 = M0 + len(matches)
     C0 = P0 + len(pairs)
-    T = C0 + len(counts)
+    T = C0 + len(slots)
     N = T + 1
 
     def build(penalty):
@@ -151,23 +162,25 @@ def solve(cands, counts, per_count, quota, iters=60, w_cell=900, w_row=260, w_co
             f.add(S, K0 + i, quota[k], 0)
         for m in matches:
             f.add(K0 + kinds.index(kind_of[m]), M0 + m_idx[m], 1, 0)
-        for (m, cnt) in pairs:
+        for key in pairs:
+            m, cnt, own = key
             def priced(c):
                 return 1000 * c["coh"] + penalty(c)
-            c = min(by_pair[(m, cnt)], key=priced)
-            rep[(m, cnt)] = c
-            f.add(M0 + m_idx[m], P0 + p_idx[(m, cnt)], 1, int(round(priced(c))))
-            f.add(P0 + p_idx[(m, cnt)], C0 + c_idx[cnt], 1, 0)
-        for cnt in counts:
-            f.add(C0 + c_idx[cnt], T, per_count, 0)
+            c = min(by_pair[key], key=priced)
+            rep[key] = c
+            f.add(M0 + m_idx[m], P0 + p_idx[key], 1, int(round(priced(c))))
+            f.add(P0 + p_idx[key], C0 + c_idx[(cnt, own)], 1, 0)
+        for s in slots:
+            f.add(C0 + c_idx[s], T, per_slot, 0)
         return f, rep
 
     def extract(f, rep):
         out = []
-        for (m, cnt) in pairs:
+        for key in pairs:
+            m = key[0]
             for e in f.g[M0 + m_idx[m]]:
-                if e[0] == P0 + p_idx[(m, cnt)] and e[1] == 0:
-                    out.append(rep[(m, cnt)])
+                if e[0] == P0 + p_idx[key] and e[1] == 0:
+                    out.append(rep[key])
         return out
 
     def spread_cost(sel):
@@ -245,4 +258,16 @@ def _diagnose(pool, counts, per_count, quota, flow, target):
         "classes_short": {k: v for k, v in quota.items() if by_kind.get(k, 0) < v},
         "matches_per_count": dict(per_c),
         "counts_short": {c: per_c[c] for c in counts if per_c[c] < per_count},
+        # The starting-team split is the newest and tightest constraint, so name the
+        # (count, team) slots that have no supply at all — that is the usual reason a
+        # previously feasible pool stops being feasible.
+        "matches_per_count_team": {
+            f"{cnt}/{'blue' if t == 0 else 'red'}":
+                len({c["match"] for c in pool
+                     if c["count"] == cnt and c.get("startown") == t})
+            for cnt in counts for t in (0, 1)},
+        "count_team_slots_empty": [
+            f"{cnt}/{'blue' if t == 0 else 'red'}"
+            for cnt in counts for t in (0, 1)
+            if not any(c["count"] == cnt and c.get("startown") == t for c in pool)],
     }

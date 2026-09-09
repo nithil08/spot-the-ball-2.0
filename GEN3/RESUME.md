@@ -13,6 +13,7 @@ full engine run each.
 | Levels | end-frame player count **exactly** 8, 9, 10 ... 19 — one count per level, two clips each |
 | "Player" | anyone on the pitch **including goalkeepers**; officials render at 2% and are invisible, so they never count |
 | Situations | **5 corner, 5 goalkeeper throw, 5 kick-off, 9 open play**, scattered across the levels |
+| Starting team | of the two clips at each count, **one starts with blue (team A) and one with red (team B)** — 12/12 overall |
 | Ball | final-frame cell roughly uniform over the 16x6 grid — explicitly NOT the old centre pile-up, but still natural |
 | Format | 125 frames @ 25 fps = 5.0 s, 16x6 grid, noname, `full_visibility` + `split_1s_4s` from ONE render pair |
 | Quality | the whole point of the batch — physics right, nothing odd, no hidden players |
@@ -182,6 +183,27 @@ COUNT is the real throttle and `nice` is only a second line of defence.
     Consequence for the study design: a counterfactual pair is two matches from the same
     seed that differ in their scenario, compared from kick-off. There is no way to hold the
     first 2310 frames fixed and then remove a player.
+
+11. **The starting team is balanced per LEVEL, inside the flow, not by filtering.**
+    The first build let possession fall where it liked and six of the twelve levels came
+    out with both clips starting on the same side (8, 11, 12, 15, 18, 19 — four of the
+    five kick-offs were red). Balancing it afterwards is not possible: swapping one clip
+    breaks the count, the situation quota or the one-clip-per-match rule.
+
+    So the constraint went into `gen3_assign` itself. The pair key became
+    `(match, count, starting team)` and each count's sink was split into two of capacity
+    one, so a level with two same-side starts is not an expensive flow, it is not a
+    feasible one. The team belongs on the WINDOW and not the match: one match can supply
+    a blue-start window at count 12 and a red-start one at count 14.
+
+    "Starting team" is `gen3_lib.start_possessor`, in three cases, because it is not one
+    lookup: whoever owns the ball on the start frame; else the last team to own it (the
+    ball is often loose mid-pass); else — only reachable in the opening frames of a match,
+    where the kick-off clips live — the first team to take it during the clip.
+
+    Cost of the rebuild: 11 of 24 windows changed, 13 reused straight from the render
+    cache. Nothing else moved — 5/5/5/9 quota exact, counts exact, 24 distinct matches,
+    24 distinct cells across all six rows, and mean coherence 0.734 -> 0.724.
 
 ## Also done
 

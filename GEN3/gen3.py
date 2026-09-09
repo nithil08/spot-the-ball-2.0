@@ -454,7 +454,8 @@ def _pool():
     plan = json.loads(PLAN.read_text())
     PIX = G.CACHE / "ballpix"
     absent = json.loads(ABSENT.read_text()) if ABSENT.exists() else {}
-    pool, skipped, blocked = [], 0, 0
+    pool, skipped, blocked, teamless = [], 0, 0, 0
+    owners = {}          # match -> owned_team track, read once from the sweep log
     for p in plan:
         cf, pf = COUNTS / f"{p['match']}.npz", PIX / f"{p['match']}.json"
         if not (cf.exists() and pf.exists()):
@@ -479,7 +480,16 @@ def _pool():
                 blocked += 1
                 continue
             px, py = pix[str(e)]
-            pool.append({"match": p["match"], "shape": p["shape"], "seed": p["seed"],
+            # Which team the clip starts with the ball. Read from the sweep log, which is
+            # camera-independent, so this costs nothing beyond one file read per match.
+            if p["match"] not in owners:
+                owners[p["match"]] = np.load(G.SWEEP / f"{p['match']}.npz")["owned_team"]
+            own = G.start_possessor(owners[p["match"]], w["start"], w["end"])
+            if own < 0:
+                teamless += 1
+                continue
+            pool.append({"startown": own,
+                         "match": p["match"], "shape": p["shape"], "seed": p["seed"],
                          "kind": p["kind"], "offset_x": p["offset_x"],
                          "offset_y": p["offset_y"], "start": w["start"], "end": w["end"],
                          "anchor": w["anchor"], "coh": w["coh"],
@@ -489,6 +499,8 @@ def _pool():
                          "px": px, "py": py, "cell": cell_of(px, py)})
     if blocked:
         print(f"  {blocked} windows excluded: the audit measured no ball at their start")
+    if teamless:
+        print(f"  {teamless} windows excluded: ball never owned, so no starting team")
     return pool, skipped
 
 
@@ -692,9 +704,15 @@ def cmd_trace(argv):
 
 # ══ phase 8: compose ═══════════════════════════════════════════════════════════
 HEADER = ("clip,situation,players_in_frame_last,players_in_play,players_hidden,"
+          "start_team,start_team_colour,"
           "ball_final_cell,final_px,final_py,ball_start_cell,start_px,start_py,"
           "offset_x,offset_y,shape,seed,match,start_frame,end_frame,n_frames,seconds,"
           "loose,apex,dnear,ball_path,coherence")
+
+# Which side starts the clip with the ball. The engine's left team is A, and
+# apply_gen3_kits paints A blue and B red — so this column names what a viewer sees, not
+# an engine index, and it moves if the kit palette ever does.
+TEAM_NAME = {0: ("A", "blue"), 1: ("B", "red")}
 
 
 def cmd_compose(argv):
@@ -713,6 +731,7 @@ def cmd_compose(argv):
         p["final_cell_measured"] = G.cell_of(fpx, fpy)
         rows.append(",".join(map(str, [
             p["clip"], p["kind"], p["count"], 22, 0,
+            *TEAM_NAME[p["startown"]],
             G.cell_of(fpx, fpy), round(fpx, 1), round(fpy, 1),
             G.cell_of(spx, spy), round(spx, 1), round(spy, 1),
             p["offset_x"], p["offset_y"], p["shape"], p["seed"], p["match"],
