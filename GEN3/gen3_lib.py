@@ -600,9 +600,14 @@ def write_clip(frames, path):
 def start_possessor(owned_team, start, end):
     """Which team the clip STARTS with the ball, as 0 (left/blue) or 1 (right/red).
 
-    `owned_team` is the sweep log's per-step possession, -1 while the ball is loose. The
-    observation is appended after each step, so log index i holds the state following step
-    i + 1 and frame f reads at f - 1.
+    `owned_team` is the sweep log's per-step possession, -1 while the ball is loose.
+
+    INDEXING. Both the sweep and the render loop observe AFTER stepping, and the render
+    loop keeps a frame when its loop index i >= start. So loop index i carries observation
+    log[i], the clip's first frame is log[start], and its last is log[end - 1] — which is
+    the index `_pool` already uses for the end-frame count. Reading log[start - 1] here
+    would sample the frame before the clip opens, which is wrong at exactly the moments
+    that matter: a possession change on the cut.
 
     Three cases, in order, because "who has the ball at the start" is not a single lookup:
 
@@ -616,13 +621,13 @@ def start_possessor(owned_team, start, end):
     Returns -1 only if the ball is never owned across the whole window, which would make
     the clip unassignable to a team; callers drop those.
     """
-    i = max(start - 1, 0)
+    i = int(start)
     if owned_team[i] >= 0:
         return int(owned_team[i])
     before = owned_team[:i]
     if (before >= 0).any():
         return int(before[before >= 0][-1])
-    during = owned_team[i:max(end - 1, i + 1)]
+    during = owned_team[i:max(end, i + 1)]
     if (during >= 0).any():
         return int(during[during >= 0][0])
     return -1

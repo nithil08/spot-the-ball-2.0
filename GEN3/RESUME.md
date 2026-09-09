@@ -24,6 +24,8 @@ full engine run each.
 GEN3/clips/full_visibility/clip_01..24.mov     ball visible throughout
 GEN3/clips/split_1s_4s/clip_01..24.mov         1 s visible, then 4 s with no ball
 GEN3/clips/ground_truth.csv                    one row per situation
+GEN3/clips/reproducibility.csv                 scenario sha + play sha per clip
+GEN3/clips/scene_graphs/clip_01..24.json       full game state, frame by frame
 GEN3/_review/gen3_{corner,gk_throw,kickoff,open}.png   frames 0/62/124 of every clip
 ```
 
@@ -201,9 +203,34 @@ COUNT is the real throttle and `nice` is only a second line of defence.
     ball is often loose mid-pass); else — only reachable in the opening frames of a match,
     where the kick-off clips live — the first team to take it during the clip.
 
-    Cost of the rebuild: 11 of 24 windows changed, 13 reused straight from the render
-    cache. Nothing else moved — 5/5/5/9 quota exact, counts exact, 24 distinct matches,
-    24 distinct cells across all six rows, and mean coherence 0.734 -> 0.724.
+    **The frame index is log[start], not log[start - 1].** The first cut of
+    `start_possessor` read one frame early and mislabelled clip_23, which silently broke
+    the level-19 balance. Both the sweep and the render loop observe AFTER stepping and
+    the render loop keeps a frame once its index reaches `start`, so loop index i carries
+    log[i]: the clip's first frame is log[start] and its last is log[end - 1] — the index
+    `_pool` already uses for the end count. The error is invisible on most frames and wrong
+    exactly on a possession change at the cut, so check labels against frame 0 of the
+    scene graph, never by eye.
+
+    Cost of the rebuild: 14 of 24 windows changed over two selections (11, then 3 more
+    after the index fix), the rest reused straight from the render cache. Nothing else
+    moved — 5/5/5/9 quota exact, counts exact, 24 distinct matches, 24 distinct cells
+    across all six rows, framing floor 81.7%, and mean coherence 0.734 -> 0.743.
+
+12. **The world-space scene graph is free; the pixel-space one is not.**
+    `scene_graph.py` exports every clip's full game state per frame — all 22 player
+    positions and velocities, ball xyz, possession, game mode, score, roles, kits, nearest
+    player to the ball, team centroids — as JSON, in seconds and with no engine run at all.
+    It is a slice of the cached sweep log, so it is exact rather than inferred. 24 files,
+    ~400 KB each, 9.4 MB for the batch. `--hide-ball-after 1.0` withholds the ball at the
+    same cut `split_1s_4s` uses, which is what a ball-prediction eval needs.
+
+    What it cannot contain is player PIXEL positions, and therefore which players are in
+    shot. The camera tracks the ball and the repo's only calibration maps the BALL between
+    world and pixel space (`solve_offsets`), not arbitrary points. Per-frame per-player
+    pixel data needs the 23-pass hide-and-diff probe widened from end frames to all frames:
+    ~23 replays per clip, so roughly half an hour across three shards for the batch.
+    Rendering is free and stepping is the cost, so that price buys every frame at once.
 
 ## Also done
 
