@@ -134,6 +134,55 @@ COUNT is the real throttle and `nice` is only a second line of defence.
    Collapsing each (match, count) pair to its most coherent window before building the flow
    made this worse still — it hides a match's row-E window behind its row-C one.
 
+9. **Every clip is exactly reproducible, and the render knobs cannot touch the play.**
+   Measured over all 24 clips, 81,180 replayed steps (`verify_reproducible.py`). Each clip
+   was replayed to its own end frame three times: twice canonically, once at a different
+   camera offset with two players hidden. All three logs — ball xyz, all 22 player
+   positions, possession, game mode, score, every step — are bit-identical, exact equality
+   and not a tolerance. So:
+
+       (scenario source, game_engine_random_seed, physics_steps_per_frame) -> the play
+
+   and `GFOOTBALL_CAM_OFFSET_X/_Y`, `GFOOTBALL_HIDE_SLOTS` and the asset bundle are
+   provably render-only. This extends the scenario docstring's determinism claim from the
+   120 steps it measured to the full 2450 a clip actually needs.
+
+   `clips/reproducibility.csv` records, per clip, the sha256 of the emitted scenario source
+   AND the sha256 of the play. `python3 verify_reproducible.py check` re-derives both in
+   one replay per clip — run it after any engine rebuild or edit to `SHAPES`, because a
+   changed scenario is otherwise completely invisible.
+
+10. **Counterfactuals must branch at frame 0. This is an engine limit, not a choice.**
+    Three routes were measured (`counterfactual_probe.py`):
+
+    * **Roster removal works.** An 11 v 10 scenario builds and runs, the observation
+      shrinks to `right_team (n, 10, 2)`, and the counterfactual replays bit-identically.
+      It diverges from the factual at step 8, so the clip's own window is a *different
+      match*, not "the same clip minus a player".
+    * **Rebuilding a scenario from logged positions is far too lossy to restart mid-play.**
+      `AddPlayer` takes only (x, y, role) and `SetBallPosition` only (x, y) — no velocity,
+      no ball height, no possession, no facing. Restarting clip_09 at frame 2310 from its
+      own logged state: ball separation 0.19 world units after 1 s, 0.37 after 2 s (the
+      pitch is 2.0 long), and possession agrees with the factual on only 22.4% of frames.
+      The logged ball z of 0.317 is simply discarded.
+    * **`get_state`/`set_state` restore exactly — but only into an identical env.** The
+      C++ serialiser returns a ~100 KB blob carrying the whole simulation; restoring it
+      into a fresh env and stepping on reproduces the factual continuation bit-identically
+      for all 125 frames. It is also **50x faster** than replaying the prefix (0.5 s
+      against 25.4 s to reach frame 2310), which is a real speed-up for any future phase
+      that needs many windows from one match.
+
+      It cannot carry an intervention. Both a changed roster (11 v 10) and a merely changed
+      env config (adding one controlled agent, same scenario file) are rejected with
+      `FATAL ERROR in [football::set_state]: Current environment scenario != scenario in
+      the state` — and it is a **fatal abort, signal 11, not a Python exception**, so it
+      cannot be caught and probed for. Test it in a throwaway process or it takes the run
+      down with it.
+
+    Consequence for the study design: a counterfactual pair is two matches from the same
+    seed that differ in their scenario, compared from kick-off. There is no way to hold the
+    first 2310 frames fixed and then remove a player.
+
 ## Also done
 
 **Per-team goalkeeper kits.** The user asked for keeper kits matching their own team
