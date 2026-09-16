@@ -1,0 +1,4 @@
+clip,shape,seed,match,start_frame,end_frame,offset_x,offset_y,frames,ball_start_cell,start_px,start_py,ball_final_cell,final_px,final_py
+clip_01,flankR,322,flankR_s322,1473,1598,16.0,10.0,125,D8,624.8,301.4,E5,328.0,334.7
+clip_02,flankL,314,flankL_s314,410,535,24.0,8.0,125,D2,88.5,307.9,D9,664.4,241.4
+clip_03,mid_push,316,mid_push_s316,622,747,-20.0,10.0,125,D6,439.2,313.5,D15,1152.3,297.7
