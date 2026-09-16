@@ -1,0 +1,3 @@
+clip,shape,seed,match,start_frame,end_frame,frames,seconds,start_team,ball_start_cell,ball_start_px,ball_start_py,ball_final_cell,ball_final_px,ball_final_py,pitch_fraction,coherence
+intro_01,flankR,308,flankR_s308,1380,1880,500,20.0,blue_left,C9,675.2,164.6,C10,735.0,186.4,0.9386,0.436
+intro_02,boxL,301,boxL_s301,340,840,500,20.0,red_right,C8,597.9,220.7,C10,794.6,194.1,0.9708,0.4467
