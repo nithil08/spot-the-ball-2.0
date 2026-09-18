@@ -328,10 +328,10 @@ def cmd_heatmap(rows):
 
     fig.text(0.055, 0.955, "Where the ball ends", fontsize=16, color=INK, weight="bold")
     fig.text(0.055, 0.905,
-             f"GEN3 pilot — final-frame ball cell for all {len(rows)} clips, on the "
-             f"{G.COLS}x{G.ROWS} answer grid. Every clip ends in a different cell "
-             f"({int((grid > 0).sum())} of {G.ROWS * G.COLS}); dots are the measured "
-             f"pixel, dashed lines a uniform spread.",
+             f"GEN3_HARD — final-frame ball cell for all {len(rows)} clips, on the "
+             f"{G.COLS}x{G.ROWS} answer grid. The {len(rows)} answers land in "
+             f"{int((grid > 0).sum())} distinct cells of {G.ROWS * G.COLS}; dots are the "
+             f"measured pixel, dashed lines a uniform spread.",
              fontsize=9, color=INK2)
     out = REVIEW / "ball_final_heatmap.png"
     fig.savefig(out)
@@ -441,7 +441,7 @@ def cmd_counts(rows):
     fig.text(0.055, 0.965, "People in frame: first frame to last",
              fontsize=16, color=INK, weight="bold")
     fig.text(0.055, 0.923,
-             "GEN3 pilot — exact counts from the 23-pass solo probe at each clip's own "
+             "GEN3_HARD — exact counts from the 23-pass solo probe at each clip's own "
              "camera offset. Sorted by the final count, which is the batch's level.",
              fontsize=9, color=INK2)
     out = REVIEW / "player_counts.png"
