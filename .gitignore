@@ -88,6 +88,9 @@ GEN2/_cache/
 # GEN3 intermediates: same story — sweep logs, probe maps, plates, render npz
 GEN3/_cache/
 
+# GEN3_HARD intermediates: same story again (11 GB of renders and sweep logs)
+GEN3_HARD/_cache/
+
 # INTRO intermediates: the 500-frame raw render passes are 884 MB each and are
 # rebuilt from the GEN3 sweep cache by `intro_clips.py render_vis/render_inv`
 INTRO/_cache/
