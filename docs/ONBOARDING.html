@@ -1,0 +1,661 @@
+<meta charset="utf-8">
+<title>Spot The Ball — Onboarding</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  :root {
+    --ink: #1a1a1a; --ink2: #555; --ink3: #777;
+    --rule: #d8d8d8; --bg2: #f6f6f4; --accent: #2b5fa8; --warn: #a8442b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Charter", "Iowan Old Style", Georgia, serif;
+    color: var(--ink); line-height: 1.55; font-size: 10.5pt; margin: 0;
+  }
+  h1 { font-size: 24pt; line-height: 1.15; margin: 0 0 4pt; letter-spacing: -0.01em; }
+  h2 {
+    font-size: 14pt; margin: 22pt 0 7pt; padding-top: 7pt;
+    border-top: 1.5px solid var(--ink); letter-spacing: -0.01em;
+    break-after: avoid;
+  }
+  h3 { font-size: 11pt; margin: 14pt 0 4pt; break-after: avoid; }
+  h4 { font-size: 10.5pt; margin: 11pt 0 3pt; color: var(--ink2); break-after: avoid; }
+  p { margin: 0 0 8pt; }
+  ul, ol { margin: 0 0 9pt; padding-left: 18pt; }
+  li { margin-bottom: 3.5pt; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.8pt;
+    background: var(--bg2); padding: 1px 3px; border-radius: 2px;
+  }
+  pre {
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.4pt;
+    background: var(--bg2); padding: 8pt 10pt; border-radius: 3px;
+    border-left: 2.5px solid var(--rule); overflow-x: auto; line-height: 1.4;
+    break-inside: avoid; margin: 0 0 9pt;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  table {
+    width: 100%; border-collapse: collapse; font-size: 9pt;
+    margin: 0 0 10pt; break-inside: avoid;
+  }
+  th {
+    text-align: left; font-weight: 600; border-bottom: 1.2px solid var(--ink);
+    padding: 4pt 7pt 4pt 0; font-size: 8.6pt; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--ink2);
+  }
+  td { padding: 4pt 7pt 4pt 0; border-bottom: 0.6px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .lede { font-size: 11.5pt; color: var(--ink2); margin: 0 0 4pt; line-height: 1.45; }
+  .meta { font-size: 8.6pt; color: var(--ink3); margin: 0 0 20pt;
+          padding-bottom: 10pt; border-bottom: 2px solid var(--ink); }
+  .box {
+    background: var(--bg2); padding: 9pt 12pt; border-radius: 3px;
+    margin: 0 0 10pt; break-inside: avoid; font-size: 9.6pt;
+  }
+  .box p:last-child, .box ul:last-child { margin-bottom: 0; }
+  .box strong:first-child { color: var(--accent); }
+  .warn { border-left: 2.5px solid var(--warn); }
+  .warn strong:first-child { color: var(--warn); }
+  .key { font-variant: small-caps; letter-spacing: 0.03em; font-weight: 600; }
+  .newpage { break-before: page; }
+  .tight li { margin-bottom: 1.5pt; }
+  .small { font-size: 9pt; color: var(--ink2); }
+  .gridfig {
+    font-family: "SF Mono", Menlo, monospace; font-size: 7.4pt; line-height: 1.25;
+    background: var(--bg2); padding: 9pt 11pt; border-radius: 3px;
+    margin: 0 0 10pt; break-inside: avoid; white-space: pre;
+  }
+  dl { margin: 0 0 10pt; }
+  dt { font-weight: 600; margin-top: 7pt; }
+  dd { margin: 1pt 0 0 0; padding-left: 14pt; color: var(--ink2); }
+  a { color: var(--accent); text-decoration: none; }
+</style>
+
+<h1>Spot The Ball</h1>
+<p class="lede">How the benchmark works, why every design choice is what it is, and what to read first.</p>
+<p class="meta">
+  Onboarding document · <code>spot-the-ball-2.0/</code> · September 2026<br>
+  Companion paper: Balamurugan et al., <em>"Spot The Ball: A Benchmark for Visual Social
+  Inference"</em>, arXiv:2511.00261
+</p>
+
+<h2>1. What we are actually trying to find out</h2>
+
+<p>
+Watch three seconds of soccer. Without any effort you know who is on which team, who is
+about to receive the pass, which player is out of position, and — even if the ball goes
+behind a cluster of bodies — roughly where it must be. Your brain builds a small model of
+the situation and runs it forward.
+</p>
+
+<p>
+Vision-language models (the image-and-text systems behind ChatGPT, Gemini, Claude) are
+good at <em>describing</em> a soccer field. They are much weaker at that inferential
+layer. This project builds a benchmark that measures precisely where the gap is, by
+asking humans and models the same questions about the same clips.
+</p>
+
+<div class="box">
+  <p><strong>The flagship task, in one sentence.</strong> Show a short clip in which the
+  ball becomes invisible partway through, then ask where the ball ended up. You cannot
+  answer by looking for the ball. You can only answer by reading the players — where they
+  are facing, who is converging, who just struck it.</p>
+</div>
+
+<p>
+That task is the whole reason for every strange-sounding decision in this repo. If a clip
+lets you find the answer any other way, the clip is broken.
+</p>
+
+<h2>2. Why a simulator instead of real footage</h2>
+
+<p>
+We generate every clip in <strong>gfootball</strong> (Google Research Football), a soccer
+simulator Google released in 2019 to train soccer-playing agents. We are not training
+anything. We use it as a <em>controlled video generator</em>.
+</p>
+
+<p>Real broadcast footage is unusable for this, for four reasons:</p>
+
+<ul>
+  <li><strong>It leaks answers.</strong> Score graphics, commentary, replay captions.</li>
+  <li><strong>It is uncontrolled.</strong> Camera cuts, varying weather, varying lighting.</li>
+  <li><strong>Players are identifiable.</strong> Numbers, hairstyles, body types, boots — a
+  model could recognise a player rather than reason about a role.</li>
+  <li><strong>There is no ground truth.</strong> Nobody can tell you the exact pixel the
+  ball occupied on frame 97.</li>
+</ul>
+
+<p>
+The simulator fixes all four. Identical lighting every time, one camera, anonymous
+players, and — because we control the world — the exact answer to every question we ask.
+</p>
+
+<div class="box warn">
+  <p><strong>The trade we accept.</strong> Simulated football is not real football. It can
+  look robotic, and passages of play can look nonsensical if you set it up carelessly. A
+  large part of this project's engineering exists to <em>measure</em> whether a given clip
+  looks like real football, and to throw away the ones that do not. See §8.</p>
+</div>
+
+<h2 class="newpage">3. The answer grid, and the four versions we tried</h2>
+
+<p>
+If we asked "where is the ball?" and accepted free text, we could not grade the answers.
+So we overlay a labelled grid on the video and the answer becomes a cell name, like
+<code>D15</code>. Rows are letters top to bottom, columns are numbers left to right.
+</p>
+
+<p>
+Every clip is rendered at <strong>1280 × 480 pixels</strong> — a wide crop of the playing
+field. The grid has to tile that rectangle exactly, in <em>square</em> cells, or some
+cells would be easier to hit than others.
+</p>
+
+<h3>How the grid evolved</h3>
+
+<table>
+  <tr>
+    <th style="width:16%">Version</th><th style="width:14%">Cells</th>
+    <th style="width:16%">Cell size</th><th>What happened</th>
+  </tr>
+  <tr>
+    <td><strong>6 × 4</strong></td><td>24</td><td>n/a</td>
+    <td>The first attempt. The grid was <em>described in the text prompt only and never
+    drawn on the image</em>. Abandoned — a model and a human were effectively imagining
+    two different grids, and neither matched ours.</td>
+  </tr>
+  <tr>
+    <td><strong>6 × 10</strong></td><td>60</td><td>rectangular</td>
+    <td>What the reference paper uses. We started from it, but wanted finer resolution and
+    square cells.</td>
+  </tr>
+  <tr>
+    <td><strong>32 × 12</strong></td><td>384</td><td>40 × 40 px</td>
+    <td>Burned onto every frame of the video, deliberately much finer than the paper. Used
+    for the early batches. Too fine in practice — see below.</td>
+  </tr>
+  <tr>
+    <td><strong>16 × 6</strong></td><td><strong>96</strong></td><td><strong>80 × 80 px</strong></td>
+    <td><strong>The locked format.</strong> Rows A–F, columns 1–16, drawn in yellow.</td>
+  </tr>
+</table>
+
+<p>
+On <strong>2026-07-08</strong> we rendered the same two clips with four labelled grids
+burned in side by side — <code>32×12</code>, <code>16×6</code>, <code>28×8</code>,
+<code>8×3</code> — and compared them directly. That comparison is what settled it.
+</p>
+
+<p class="small" style="margin-bottom:4pt">16 × 6 — the locked grid. 1280 / 16 = 80 px. 480 / 6 = 80 px. Square, and it tiles the frame exactly.</p>
+<div class="gridfig">     1    2    3    4    5    6    7    8    9   10   11   12   13   14   15   16
+  +----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+A |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |
+  +----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+B |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |
+  +----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+C |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |
+  +----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+D |    |    |    |    |    |    |    |    |    |    |    |    |    |    | ** |    |
+  +----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+E |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |
+  +----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+F |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |    |
+  +----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+</div>
+<p class="small" style="margin-top:-5pt">The <code>**</code> marks cell <strong>D15</strong> — row D, column 15. That string is a complete, gradable answer.</p>
+
+<h3>Why 16 × 6 and not the finer grid</h3>
+
+<ul>
+  <li><strong>384 cells is finer than anyone's actual certainty.</strong> At 40 px a cell,
+  neither a human nor a model can meaningfully distinguish a cell from its neighbour on a
+  moving 1280-wide video. You get precision you cannot justify.</li>
+  <li><strong>It makes the scoring dishonest.</strong> On a 384-cell grid, "one cell off"
+  and "the other end of the pitch" both score zero. The grid should be coarse enough that
+  landing in the right cell means you were genuinely right.</li>
+  <li><strong>It makes the statistics unusable.</strong> A batch is a few dozen clips. Spread
+  across 384 cells, almost every cell is empty and you can say nothing about coverage.
+  Across 96 you can: GEN3_HARD's 24 answers land in 23 distinct cells, covering all 6 rows
+  and 14 of 16 columns.</li>
+  <li><strong>96 cells is labelable.</strong> A–F and 1–16 is easy to say out loud, easy to
+  type into a form, and impossible to misread.</li>
+</ul>
+
+<div class="box warn">
+  <p><strong>Locked.</strong> The benchmark is fixed at 16 × 6 with no player names. Do not
+  revert to 32 × 12, and do not render names. Anything produced in another format cannot
+  be pooled with the existing batches.</p>
+</div>
+
+<h2>4. What one clip looks like</h2>
+
+<p>Every clip in the current format:</p>
+
+<table>
+  <tr><th style="width:30%">Property</th><th>Value</th></tr>
+  <tr><td>Resolution</td><td>1280 × 480 (wide crop of the pitch)</td></tr>
+  <tr><td>Duration</td><td>5.0 seconds (the intro clips are 20 s)</td></tr>
+  <tr><td>Frame rate</td><td>25 fps → 125 frames</td></tr>
+  <tr><td>Grid</td><td>16 × 6, yellow, rows A–F, columns 1–16, burned into every frame</td></tr>
+  <tr><td>Team A kit</td><td>Blue outfield, pale sky blue goalkeeper</td></tr>
+  <tr><td>Team B kit</td><td>Red outfield, pale coral goalkeeper</td></tr>
+  <tr><td>Officials</td><td>Invisible (rendered at 2% scale)</td></tr>
+  <tr><td>Player names</td><td>None — rendered with a blank font</td></tr>
+  <tr><td>Start marker</td><td>Red circle around the ball on the first frame only</td></tr>
+</table>
+
+<p>Each clip ships in <strong>two versions</strong>:</p>
+
+<ul class="tight">
+  <li><code>full_visibility/</code> — ball visible for all 5 s. Used for checking and for
+  tasks that are not the hidden-ball task.</li>
+  <li><code>split_1s_4s/</code> — ball visible for 1 second, then invisible for 4 seconds.
+  <strong>This is the actual stimulus.</strong> The subject must name the cell the ball
+  is in on the final frame.</li>
+</ul>
+
+<div class="box">
+  <p><strong>What "invisible" means here — this trips everyone up.</strong> The ball is
+  <em>not</em> removed from the simulation. It is shrunk until it cannot be seen. It is
+  still there, still being passed, still governing where every player runs. Same for the
+  referee, and same for the hidden-player experiments. If we deleted these objects the
+  football would change and the question would have no answer.</p>
+</div>
+
+<h4>Why goalkeepers wear a pale version of their own team's colour</h4>
+<p class="small">
+They used to wear yellow — a colour belonging to neither side. Viewers read a yellow
+keeper as a <em>third team</em>, which is exactly the wrong inference. Pale blue and pale
+coral keep each keeper legibly part of his own side while still marking him as the keeper.
+</p>
+
+<h2 class="newpage">5. Why we never show a goal</h2>
+
+<p>This is one of the firmest rules in the project, and it has three separate reasons.</p>
+
+<ol>
+  <li><strong>A goal teleports the ball.</strong> When a goal is scored the engine
+  instantly respots the ball on the centre mark — measured as a 1.017-unit jump in a single
+  frame. If that happens inside a clip, the ball's path is discontinuous and the question
+  "where did it end up?" has no sensible answer.</li>
+  <li><strong>A goal resets both teams.</strong> All 22 players snap back to their formation.
+  The passage of play you were watching simply stops existing.</li>
+  <li><strong>A goal is a different, easier question.</strong> Once the ball is in the net,
+  everyone's body language tells you where it went. The task becomes reading celebration
+  rather than reading play.</li>
+</ol>
+
+<p>
+So every clip is <strong>one unbroken passage of continuous play</strong>. We enforce this
+differently depending on the batch:
+</p>
+
+<ul>
+  <li><strong>In the drills</strong> (§6), the renderer detects any goal, goal-line crossing,
+  or teleport, and discards that seed entirely, keeping only seeds where the ball keeps
+  circulating.</li>
+  <li><strong>In the match batches</strong> (§7), the match is configured with
+  <code>end_episode_on_score = False</code>, so play continues after a goal and we get more
+  usable footage per match. A window may then <em>begin</em> at a post-goal restart — but
+  the window is forced to start at the restart frame itself, so the goal and the respot are
+  never inside the clip.</li>
+</ul>
+
+<p class="small">
+Related: <code>end_episode_on_out_of_play</code> and
+<code>end_episode_on_possession_change</code> are also off, for the same reason — we want
+long continuous matches to cut windows from, not short fragments.
+</p>
+
+<h2>6. The drills era — hand-built scenarios</h2>
+
+<p>
+The first serious clip batches were <strong>drills</strong>: small, hand-authored set-ups
+where we placed players ourselves and let the engine play it out. The point was coverage —
+each drill produces a characteristically different kind of ball movement, so the benchmark
+is not 40 clips of the same thing.
+</p>
+
+<p>There are eight, in <code>DRILLS/</code> (70 clips rendered):</p>
+
+<table>
+  <tr><th style="width:5%">#</th><th style="width:28%">Drill</th><th>What kind of ball movement it produces</th></tr>
+  <tr><td>1</td><td>4v4 small-sided</td><td>Balanced open play through the middle. The baseline.</td></tr>
+  <tr><td>2</td><td>3v1 rondo (keep-away)</td><td>Tight, fast handoffs in a small space. Short total ball path (~0.3–0.4).</td></tr>
+  <tr><td>3</td><td>5v2 rondo</td><td>Wider circulation with passes split through the middle.</td></tr>
+  <tr><td>4</td><td>Fast break 3v2</td><td>Directional forward travel — the ball covers ground toward goal.</td></tr>
+  <tr><td>5</td><td>Wing cross</td><td>Long sideways travel across the final third.</td></tr>
+  <tr><td>6</td><td>Switch of play</td><td>Maximum lateral displacement — ball crosses the full width (~1.0).</td></tr>
+  <tr><td>7</td><td>Free kick</td><td>Set piece: dead ball outside the box worked back into open play.</td></tr>
+  <tr><td>8</td><td>Corner kick</td><td>Set piece: delivery from the corner flag circulated in the box.</td></tr>
+</table>
+
+<p>
+Each drill runs in <strong>3 position variants</strong> (small jitters to the starting
+layout) × <strong>2 versions</strong> (visible / split), which is where the clip count comes
+from. Set-piece variants with no goal-free seed are skipped rather than shipped.
+</p>
+
+<h4>The one drill we had to fix</h4>
+<p class="small">
+<strong>Wing cross</strong> originally kept producing goals, because a cross into the
+goalmouth is a shot waiting to happen. It was re-aimed to circulate the ball
+<em>across and away from</em> the goalmouth, so the passage stays alive. This is the rule
+in §5 biting in practice.
+</p>
+
+<h2 class="newpage">7. Why we moved on from drills, and what replaced them</h2>
+
+<p>
+Drills gave us control, but control turned out to be the problem. A hand-placed scenario
+is a <em>staged</em> situation: we decided in advance that this would be a rondo, so the
+clip shows a rondo. Two consequences:
+</p>
+
+<ul>
+  <li><strong>The football is only as good as our guess.</strong> We are not soccer coaches.
+  Hand-placed positions produce play that a real analyst would find slightly off.</li>
+  <li><strong>It does not scale, and it is not natural.</strong> Eight drills is eight
+  shapes of play, forever. Real matches produce situations we would never think to stage.</li>
+</ul>
+
+<p>
+So the approach inverted. Instead of <em>staging</em> a situation, we now
+<strong>run full 11-a-side matches and go looking for situations that occurred naturally</strong>.
+</p>
+
+<div class="box">
+  <p><strong>The pipeline, in five steps.</strong></p>
+  <ol class="tight" style="margin-bottom:0">
+    <li><span class="key">Sweep</span> — play many full matches, varying the starting shape
+    and the random seed, and log every frame of every match.</li>
+    <li><span class="key">Detect</span> — scan those logs for the situation types we want
+    (a corner, a keeper's throw, a kick-off, a stretch of open play).</li>
+    <li><span class="key">Score</span> — measure each candidate 5-second window against the
+    coherence statistics in §8, and reject the ones that do not read as football.</li>
+    <li><span class="key">Select</span> — pick the surviving windows that give the batch the
+    spread it needs (headcounts, situation mix, ball-position spread, team balance).</li>
+    <li><span class="key">Render</span> — render each chosen window twice, visible and split,
+    and measure the ground truth.</li>
+  </ol>
+</div>
+
+<p>
+The starting shapes are still ours — there are <strong>14</strong> of them, and they steer
+<em>where on the pitch play tends to happen</em>, which in turn controls how many bodies the
+camera frames:
+</p>
+
+<table>
+  <tr><th style="width:26%">Shape family</th><th style="width:34%">What it sets up</th><th>Headcount it produces</th></tr>
+  <tr><td>Midfield (5 shapes)</td><td>Both banks of players in shot</td><td>High — 16 to 19 people</td></tr>
+  <tr><td>Flank / box (4 shapes)</td><td>Pressure in the final third</td><td>Source of corners and keeper throws</td></tr>
+  <tr><td>Wide + even (2 shapes)</td><td>Contested wide play that stays alive</td><td>Middle — 11 to 15</td></tr>
+  <tr><td>Counterattack (2 shapes)</td><td>One side committed high, the other deep</td><td>Low — 8 to 10</td></tr>
+</table>
+
+<p class="small">
+The counterattack shapes matter more than they look. With a ball-tracking camera, "few
+players on screen" almost always means play is jammed into a corner and about to go out
+of bounds — so low headcounts and stoppages become the same event, which would confound
+the benchmark. A genuine breakaway is the one situation where live, attended play really
+does frame only a handful of bodies.
+</p>
+
+<h3>The four situation classes we settled on</h3>
+
+<p>
+From everything the drills explored, the batches narrowed to four detectable classes. A
+24-clip batch is always split the same way:
+</p>
+
+<table>
+  <tr><th style="width:22%">Class</th><th style="width:10%">Count</th><th>Why it is in the set</th></tr>
+  <tr><td><strong>Open play</strong></td><td>9</td><td>The default. Continuous possession and passing with no restart involved.</td></tr>
+  <tr><td><strong>Corner kick</strong></td><td>5</td><td>Many bodies packed into the box — the hardest crowding case.</td></tr>
+  <tr><td><strong>Goalkeeper distribution</strong></td><td>5</td><td>Ball travels a long way from a known origin. Tests long-range inference.</td></tr>
+  <tr><td><strong>Kick-off</strong></td><td>5</td><td>Both teams in known formation. The cleanest, most legible starting state.</td></tr>
+</table>
+
+<div class="box warn">
+  <p><strong>A real engine quirk worth knowing.</strong> gfootball never labels a kick-off.
+  Measured across 120 cached matches — 330,000 frames — the kick-off game mode fired
+  <em>exactly zero times</em>, while goal kicks and free kicks fired constantly. Restarts
+  still happen; the engine just does not tag them. So we detect kick-offs by
+  <em>behaviour</em> instead: the ball respotted on the centre mark with both sides behind
+  the halfway line. Corners are similarly rare — roughly 0.03 per match — which is why
+  corner clips are always the scarcest and the slowest to collect.</p>
+</div>
+
+<h2 class="newpage">8. Coherence — how we decide a clip looks like football</h2>
+
+<p>
+This is the most important quality mechanism in the project, and it exists because of a
+failure.
+</p>
+
+<p>
+One batch (<code>GEN2</code>, second version) produced clips that were obviously wrong:
+bouncy, illogical, not football. The intuitive suspect was the physics engine. We measured
+it, and physics was <strong>ruled out</strong>. The real causes were mundane
+configuration: lopsided team difficulty, offsides switched off, and a bad selection gate.
+</p>
+
+<p>
+The fix was to stop eyeballing clips and start measuring them. Every candidate window gets
+four numbers:
+</p>
+
+<dl>
+  <dt>loose</dt>
+  <dd>Fraction of frames where <em>nobody</em> has possession. High means the ball is
+  pinballing around rather than being played.</dd>
+  <dt>apex</dt>
+  <dd>The maximum height the ball reaches. High means it spent the clip in the air rather
+  than being worked along the ground.</dd>
+  <dt>dnear</dt>
+  <dd>Median distance from the ball to the nearest player. High means the ball is out in
+  space with nobody involved.</dd>
+  <dt>path</dt>
+  <dd>Total distance the ball travelled. Gated at both ends — too low is a static clip,
+  too high is frantic.</dd>
+</dl>
+
+<p>These combine into a single score:</p>
+
+<pre><code>coherence = loose × 2.0  +  apex / 3.2  +  dnear / 4.0</code></pre>
+
+<div class="box warn">
+  <p><strong>LOWER IS BETTER.</strong> A low score means a mostly-owned ball, kept low,
+  kept close to a player. This is genuinely easy to get backwards, and it has already been
+  gotten backwards once in a RESUME file — see §12.</p>
+</div>
+
+<p>
+The thresholds are <strong>per situation class</strong>, not global. A corner is an
+unowned ball in flight <em>by definition</em>, and a keeper's delivery goes up in the air
+on purpose. Holding those to open play's numbers would reject every single one. Each class
+gets the bounds its own physics allows, and within a class the ranking picks the calmest
+instance.
+</p>
+
+<h2>9. How we know the right answer</h2>
+
+<p>
+We never estimate the ground truth from the video. We <strong>measure</strong> it, using a
+technique called <em>hide-and-diff</em> that appears everywhere in this project.
+</p>
+
+<h3>Ball position</h3>
+<p>
+Render the exact same deterministic passage of play twice — once with the ball visible,
+once with it invisible — and subtract the two image sequences. Everything identical
+cancels out. What remains is the ball, and its pixel position is exact. That pixel is then
+mapped to a grid cell.
+</p>
+
+<h3>Counting people in frame</h3>
+<p>
+Same idea, 23 times. Render a "plate" with all 22 players hidden, then render 22 more
+passes, each showing exactly one player, and diff each against the plate. A player whose
+diff has enough changed pixels is on screen. This gives an exact per-player, per-frame
+answer.
+</p>
+
+<div class="box">
+  <p><strong>Why not just count coloured blobs?</strong> Because it does not work. The
+  advertising hoardings around the pitch are saturated blue and red — the same colours as
+  the kits — which biases a blob count by about <strong>+6 people</strong>. Fitting the
+  camera frustum geometrically was also tried, and gets the per-frame count exactly right
+  only 36% of the time. Plate-versus-solo is the only exact method.</p>
+</div>
+
+<p class="small">
+The cost is real: 23 render passes per clip, and every pass has to replay the match from
+frame 0 to reach the window. For a 24-clip batch that is about 50 minutes on three
+parallel workers. Budget for it — it is not optional if you need per-frame counts.
+</p>
+
+<h2>10. The engine modifications</h2>
+
+<p>
+Stock gfootball cannot produce these clips, so we maintain four small C++ patches in
+<code>engine_patches/gfootball_engine.patch</code>. Each is driven by an environment
+variable and is a <strong>no-op when unset</strong>, so an unpatched-looking run is
+byte-identical to stock.
+</p>
+
+<table>
+  <tr><th style="width:24%">Patch</th><th style="width:30%">Switch</th><th>What it does</th></tr>
+  <tr><td><code>match.cpp</code></td><td><code>GFOOTBALL_CAM_OFFSET_X/_Y</code></td>
+      <td>Shifts the camera's aim point off the ball.</td></tr>
+  <tr><td><code>humanoidbase</code></td><td>(mechanism only)</td>
+      <td>Adds <code>renderScale</code> — shrinks a player's <em>drawn</em> body.</td></tr>
+  <tr><td><code>playerofficial.cpp</code></td><td>always on</td>
+      <td>Officials at 2% scale — invisible referees, in every clip.</td></tr>
+  <tr><td><code>team.cpp</code></td><td><code>GFOOTBALL_HIDE_SLOTS</code><br><code>GFOOTBALL_TEAM_GK_KITS</code></td>
+      <td>Hides named players while they stay in play; gives each keeper his own team's colour.</td></tr>
+</table>
+
+<h4>Why the camera patch exists</h4>
+<p>
+Stock gfootball aims the camera <em>at the ball</em>. The ball therefore renders dead
+centre in every single frame, and every grid answer collapses into the middle few cells —
+which destroys the benchmark. The offset shifts the aim point so the ball sits off-centre,
+the way a real camera operator frames play. This is why GEN3_HARD's answers spread across
+23 of 96 cells instead of clustering.
+</p>
+
+<div class="box warn">
+  <p><strong>None of these patches touch physics.</strong> Ball dynamics live in
+  <code>ball.cpp</code> as compile-time constants (bounce 0.62, drag 0.015, friction 0.04,
+  gravity −9.81) and read nothing from players. The camera patch modifies a local copy of a
+  predicted ball position used only as a look-at target — it cannot move the ball. The
+  shrink patches touch the render mesh only, leaving the source mesh full-size. This
+  separation is load-bearing for the whole methodology: if hiding a player changed the
+  football, every hide-and-diff measurement in §9 would be meaningless.</p>
+</div>
+
+<h2 class="newpage">11. Difficulty — the one dial that changes the football</h2>
+
+<p>
+gfootball exposes a single <strong>difficulty</strong> value per team, 0.0 to 1.0, frozen
+at kickoff. It is read in exactly three places in the entire engine: a multiplier on all
+player stats, added reaction latency, and how far a player will chase an opponent.
+</p>
+
+<p>It is worth knowing two things about it:</p>
+
+<ul>
+  <li><strong>It is per team, not per player.</strong> All 11 players share one number.
+  There is no per-player setting and no way to add one from the Python side — it would
+  take a small engine patch (which would not require touching physics).</li>
+  <li><strong>Both squads are otherwise identical.</strong> The engine hardcodes 11 player
+  profiles with differing stats, and assigns the <em>same 11</em> to both teams. So
+  difficulty is the only asymmetry lever available.</li>
+</ul>
+
+<p>
+That last point explains a real trade-off in the current batches. <code>GEN3</code> ran its
+final-third shapes lopsided — one side at 1.00 against 0.60 — specifically to manufacture
+attacking pressure, which is where corners and keeper throws came from.
+<code>GEN3_HARD</code> runs both sides at 0.95 (gfootball's own "hard" preset), which
+removes that lever entirely.
+</p>
+
+<h2>12. What exists right now</h2>
+
+<table>
+  <tr><th style="width:24%">Batch</th><th style="width:12%">Clips</th><th style="width:14%">Status</th><th>What it is</th></tr>
+  <tr><td><code>DRILLS</code></td><td>70 files</td><td>Built</td><td>The 8 hand-authored drills.</td></tr>
+  <tr><td><code>MATCH_SITUATIONS</code></td><td>22 files</td><td>Built</td><td>Set-piece and player-count drills.</td></tr>
+  <tr><td><code>30_1s_visible_4s_invisible</code></td><td>30 files</td><td>Built</td><td>The first batch in the 1s/4s split format. Has a Gemini evaluation attached.</td></tr>
+  <tr><td><code>GEN2</code></td><td>122 files</td><td><strong>Paused</strong></td><td>A 160-clip classification set, stopped mid-build. See <code>GEN2/RESUME.md</code>.</td></tr>
+  <tr><td><code>GEN3</code></td><td>24 clips</td><td>Built &amp; verified</td><td>The pilot. Exact headcounts 8–19, two per level.</td></tr>
+  <tr><td><code>GEN3_HARD</code></td><td>24 clips</td><td>Built &amp; verified</td><td>The same spec at hard difficulty both sides.</td></tr>
+  <tr><td><code>INTRO</code></td><td>2 clips</td><td>Built</td><td>20-second clips for the experiment's instructions page.</td></tr>
+</table>
+
+<p>Beyond the video, the built batches also ship:</p>
+
+<ul class="tight">
+  <li><strong><code>ground_truth.csv</code></strong> — one row per clip: situation, headcount,
+  ball start and final cell, exact pixels, the seed and frame window, and the coherence numbers.</li>
+  <li><strong><code>scene_graphs/</code></strong> — per-frame JSON of the full game state:
+  every player's position, velocity and role, possession, score, game mode.</li>
+  <li><strong>Exact reproducibility</strong> — <code>reproduce_clip.py</code> rebuilds any
+  clip as a byte-identical file. One known limit: a counterfactual must branch at frame 0,
+  because the engine's state-setting cannot intervene mid-clip.</li>
+</ul>
+
+<div class="box warn">
+  <p><strong>Open correction, not yet applied.</strong>
+  <code>GEN3_HARD/RESUME.md</code> states that hard-versus-hard play scored "materially
+  more coherent". That reads the scale backwards. Recomputed from the shipped CSVs:
+  GEN3 = <strong>0.743</strong>, GEN3_HARD = <strong>0.844</strong>, and lower is better —
+  so the hard batch is <em>less</em> coherent, driven by a looser ball (0.165 vs 0.127) and
+  more air time (1.112 vs 0.998). The figure quoted in the file (0.858) also does not match
+  the shipped data (0.844). Fix this before anyone cites it.</p>
+</div>
+
+<h2>13. Where to start</h2>
+
+<ol>
+  <li><strong>Watch clips before reading code.</strong> Open
+  <code>GEN3/clips/full_visibility/clip_01.mov</code>, then the matching
+  <code>split_1s_4s/</code> version, and try the task yourself. Nothing else in this
+  document will land until you have.</li>
+  <li><strong>Open <code>GEN3/clips/ground_truth.csv</code></strong> next to the clips you
+  just watched. Every column is explained in §12.</li>
+  <li><strong>Read <code>docs/README.md</code></strong> — the original orientation doc.</li>
+  <li><strong>Read <code>GEN3/RESUME.md</code></strong> — the build log for the pilot,
+  including what went wrong and how many audit rounds it took.</li>
+  <li><strong>Then the code</strong>, in this order: <code>gen3_lib.py</code> (shapes,
+  coherence, situation detectors), <code>gen3.py</code> (the phases), and
+  <code>gen3_report.py</code> (the review charts).</li>
+</ol>
+
+<h3>Vocabulary you will hit immediately</h3>
+
+<table>
+  <tr><th style="width:26%">Term</th><th>Meaning</th></tr>
+  <tr><td><strong>shape</strong></td><td>A starting formation + ball position + difficulty setting. There are 14.</td></tr>
+  <tr><td><strong>seed</strong></td><td>The random seed for a match. Shape + seed identifies a specific match.</td></tr>
+  <tr><td><strong>window</strong></td><td>The 125-frame stretch of a match that becomes a clip.</td></tr>
+  <tr><td><strong>slot</strong></td><td>A player's index within a team, written <code>L0</code>–<code>L10</code> / <code>R0</code>–<code>R10</code>.</td></tr>
+  <tr><td><strong>plate</strong></td><td>A render with everything hidden, used as the baseline for diffing.</td></tr>
+  <tr><td><strong>split</strong></td><td>The 1s-visible / 4s-invisible version — the real stimulus.</td></tr>
+  <tr><td><strong>bundle</strong></td><td>A packaged set of game assets (kits, fonts, ball size) the engine loads at startup.</td></tr>
+  <tr><td><strong>sweep</strong></td><td>The phase that plays many matches and logs them.</td></tr>
+  <tr><td><strong>probe / trace</strong></td><td>The 23-pass hide-and-diff measurement of who is on screen.</td></tr>
+</table>
+
+<div class="box">
+  <p><strong>Two habits that will save you.</strong> First: the engine leaks memory and a
+  process dies at roughly its 46th match with no error message — this is why every phase
+  does a bounded amount of work, exits, and is restarted by a shell loop. That is not a
+  bug, it is the workaround. Second: exit codes are how this pipeline reports success. Never
+  put a filter or a pipe between a stage and its status — it has already silently swallowed
+  a failure once.</p>
+</div>
+
+</html>
