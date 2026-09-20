@@ -94,3 +94,7 @@ GEN3_HARD/_cache/
 # INTRO intermediates: the 500-frame raw render passes are 884 MB each and are
 # rebuilt from the GEN3 sweep cache by `intro_clips.py render_vis/render_inv`
 INTRO/_cache/
+
+# GOALS: clips + contact sheets are re-cut from the GEN3 sweep by render_goal.py
+GOALS/clips/
+GOALS/_review/
