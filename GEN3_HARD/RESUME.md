@@ -10,6 +10,17 @@ Read `../GEN3/RESUME.md` first. Everything it records about the pipeline, the ca
 offset, the counting probe, the flow assignment and the engine's limits still holds — this
 file only records what is DIFFERENT and what the difficulty change actually cost.
 
+**REBUILT 2026-09-21** for the slide-cap bug written up in `../GEN3/RESUME.md`: restart
+clips were opening after their own restart (12 of 15 here — all 5 corners 35-40 frames
+late, plus 4 kick-offs). Same one-line fix, same verifier check. One thing was different
+and is worth knowing if this happens again: **the rebuild was NOT free here.** GEN3's
+corrected windows were all already probed, but this batch's only count-19 blue-start
+window was one of the late slide positions, so selection came back INFEASIBLE at 23/24.
+Hard-v-hard play frames fewer people (19 was reachable in just 2 matches), so 20 more
+midfield open matches — `mid_r` and `mid_push`, the only shapes that ever reached 19 —
+were added to the plan and probed, which restored it to 4 matches at 19 and a feasible
+assignment. Cost about 40 minutes of probe across 3 shards.
+
 ## What is identical to GEN3
 
 | | |
