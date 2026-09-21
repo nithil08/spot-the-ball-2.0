@@ -54,11 +54,16 @@ SWEEP_STEPS = 2750                     # ~110 s of match, matching the GEN2 swee
 # are still accelerating out of their scenario placement and it does not read as live play.
 # Kick-off windows are exempt by construction — that IS the restart.
 SKIP_START = 25
-# A restart clip has to SHOW its restart, so its window can only slide so far before
-# the delivery falls out of the opening seconds. 50 frames at 25 fps puts the latest
-# delivery 2 s into a 5 s clip, which still reads unmistakably as a corner or a
-# kick-off — and every extra slide position is another player count that scarce match
-# can offer, which is what makes 5 corners reachable at all.
+# A restart clip has to SHOW its restart, so the window may slide later only until its
+# first frame reaches the DELIVERY — `_candidates` caps every offset at `anchor - base`
+# on top of this number, which for a restart is exactly `LEAD[kind]`.
+#
+# The cap used to be this number alone, and that was a bug: the base is already
+# `anchor - LEAD`, so a 50-frame slide put the start up to 40 frames PAST the delivery
+# and the restart happened before the clip opened. Every corner in the first build was
+# cut that way — the ball was in the six-yard box on frame 0 and the clip labelled
+# "corner" never showed one. A slide can only ever move the delivery EARLIER in the clip,
+# never later, so a cap larger than the lead cannot mean what this comment once claimed.
 SLIDE = {"corner": 50, "kickoff": 50, "gk_throw": 50, "open": 10_000}
 STRIDE = 5
 
@@ -183,14 +188,17 @@ def _candidates(log, kind, n):
         base = max(r["anchor"] - G.LEAD.get(kind, 0), r["min_start"])
         # Sliding the window later keeps the situation on screen while changing which
         # frame is the LAST one — which is the frame the count is measured on. For a
-        # restart the slide is capped so the delivery stays inside the opening second;
-        # open play has nothing to stay near, so it slides freely.
-        offsets = [0] if kind == "open" else range(0, SLIDE[kind] + 1, STRIDE)
+        # restart the slide stops at the delivery itself, so the restart is always on
+        # camera; open play has nothing to stay near, so it slides freely.
+        cap = SLIDE[kind] if kind == "open" else min(SLIDE[kind], r["anchor"] - base)
+        offsets = [0] if kind == "open" else range(0, max(cap, 0) + 1, STRIDE)
         for off in offsets:
             s = base + off
             e = s + G.CLIP_FRAMES
             if not window_ok(log, kind, s, e, n):
                 continue
+            if kind != "open" and s > r["anchor"]:
+                continue                       # the restart would precede the clip
             c = G.coherence(log, s, e)
             if not G.engaged(kind, c):
                 continue

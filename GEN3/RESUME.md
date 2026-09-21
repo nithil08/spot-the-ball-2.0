@@ -1,9 +1,46 @@
 # GEN3 — the 24-clip Stanford pilot batch
 
-**BUILT 2026-08-30.** 24 situations, 48 clips, `verify_gen3.py` passes every check.
-This file is now a record of what was built and how, not a resume point. If you are
-changing the batch, read "What was measured" first — several of those findings cost a
-full engine run each.
+**BUILT 2026-08-30. REBUILT 2026-09-21** — the whole 24 was re-cut after the slide-cap
+bug below; `verify_gen3.py` passes every check, including the new one that catches it.
+This file is a record of what was built and how, not a resume point. If you are changing
+the batch, read "What was measured" first — several of those findings cost a full engine
+run each.
+
+## The slide-cap bug (2026-09-21) — every restart clip opened after its restart
+
+A clip labelled `corner` opened with the ball already bouncing in the six-yard box, the
+corner itself never on camera. Measured across the first build: all 5 corners opened
+30-41 frames (1.2-1.6 s) after the delivery, 4 of 5 keeper throws 12 frames after the
+release, and 2 kick-offs 21-30 frames after the restart — 11 of 15 restart clips.
+
+`_candidates` sets `base = anchor - LEAD[kind]` and then slid the window later by up to
+`SLIDE[kind] = 50` frames. A slide can only move the delivery EARLIER in the clip, so
+past `LEAD` frames of slide the restart falls out of the front of the window entirely.
+The comment on `SLIDE` claimed the opposite ("the delivery stays inside the opening
+second") and was never true. Fix: the offset is capped at `anchor - base` as well, so the
+last legal start is the delivery frame itself, and `verify_gen3.py` now fails the batch if
+any picked restart window has `start > anchor`.
+
+Rebuild cost and consequences, for the next person:
+
+* The corrected windows are a strict SUBSET of the old ones, so every one of them was
+  already probed — re-selection needed no engine at all. `_cache/plan.json` was rewritten
+  in place from the corrected shortlist, keeping each match's camera offset, because the
+  probe is only valid at the offset it ran at.
+* Corner matches fell 17 -> 13 (quota is 5) and the 4 that dropped had no legal window
+  that also passed `continuous`/`engaged`.
+* Corner coherence got worse (mean ~2.1 against ~0.9) and that is correct, not a
+  regression: the delivery is a long unowned ball in the air, which is exactly what
+  `loose` and `apex` penalise. Coherence ranks windows of the SAME class; it does not
+  compare a corner against open play.
+* The joint assignment is global, so fixing 5 corners re-cut 20 of the 24 clips. Renders
+  are keyed by window, so only the changed ones cost anything.
+* The audit rejected three openings the old cut never had to survive — at the arc the
+  camera can hold no visible ball for the first frames. The select/render/audit loop
+  cleared it in three rounds.
+* Everything derived was regenerated: ground truth, scene graphs, classification,
+  heatmap, contact sheets and `reproducibility.csv` (24/24 deterministic and
+  render-invariant again, 81,861 steps replayed).
 
 ## The spec (confirmed with the user, do not reinterpret)
 

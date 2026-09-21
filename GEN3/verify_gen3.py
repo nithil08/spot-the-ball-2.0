@@ -96,6 +96,17 @@ def check(picks):
 
     want("nobody hidden", all(p.get("players_hidden", 0) == 0 for p in picks))
 
+    # A restart clip must SHOW its restart. `anchor` is the delivery — the first frame the
+    # ball moves after the referee respots it — so a clip that opens after its own anchor
+    # is a corner whose corner already happened, which is what the first build shipped:
+    # all five corners opened 30-41 frames late with the ball already in the six-yard box.
+    # The cause was a slide cap larger than the lead in gen3.py `_candidates`; this check
+    # is against the PICKS, so it catches the mistake however it is reintroduced.
+    late = {p["clip"]: p["start"] - p["anchor"] for p in picks
+            if p["kind"] != "open" and p["start"] > p["anchor"]}
+    want("every restart clip opens at or before its delivery", not late,
+         f"late {late}" if late else "")
+
     print("\n== the rendered frames ==")
     green, balldiff, cont = [], [], []
     for p in picks:
