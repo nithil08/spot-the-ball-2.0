@@ -56,10 +56,17 @@ def main():
 
     # The level, from the KEY. Re-measured at full resolution by verify_final_frame when
     # that has run; the key is what a consumer reads either way.
-    opens = sorted(int(key[p["clip"]]["players_in_frame_first"]) for p in picks)
-    expect = sorted(c for c in G.START_COUNTS for _ in range(G.PER_COUNT))
-    per = {c: opens.count(c) for c in sorted(set(opens))}
-    want("opening counts are 8..19, two each", opens == expect, f"got {per}")
+    col = ("players_in_frame_last" if G.LEVEL_AT == "end"
+           else "players_in_frame_first")
+    lv = sorted(int(key[p["clip"]][col]) for p in picks)
+    expect = sorted(c for c in G.LEVELS for _ in range(G.PER_COUNT))
+    per = {c: lv.count(c) for c in sorted(set(lv))}
+    want(f"{'closing' if G.LEVEL_AT == 'end' else 'opening'} counts are 8..19, two each",
+         lv == expect, f"got {per}")
+    other = sorted(int(key[p["clip"]]["players_in_frame_first"
+                                      if G.LEVEL_AT == "end"
+                                      else "players_in_frame_last"]) for p in picks)
+    print(f"  [    ] the other end, for reference: {sorted(set(other))}")
 
     # Diversity by PLAY, not by name: identical ball tracks are one match under two names.
     shared, tracks = {}, {}

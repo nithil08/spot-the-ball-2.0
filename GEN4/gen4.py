@@ -470,8 +470,10 @@ def cmd_windows(argv):
                             "start": w["start"], "end": w["end"], "anchor": w["anchor"],
                             "coh": w["coh"], "loose": w["loose"], "apex": w["apex"],
                             "dnear": w["dnear"], "path": w["path"], "startown": own,
-                            "count": int(body[:, at[s]].sum()),        # the LEVEL
-                            "count_end": int(body[:, at[e]].sum())})
+                            "count_first": int(body[:, at[s]].sum()),
+                            "count_last": int(body[:, at[e]].sum()),
+                            "count": int(body[:, at[e if G.LEVEL_AT == "end"
+                                                 else s]].sum())})
     WINDOWS.write_text(json.dumps(out))
     lv = {}
     for w in out:
@@ -479,12 +481,13 @@ def cmd_windows(argv):
     print(f"windows: {len(out)} legal windows over "
           f"{len({w['match'] for w in out})} matches"
           + (f" ({missing} planned matches not probed yet)" if missing else ""))
-    print("  matches able to supply each opening level:")
-    for n in G.START_COUNTS:
+    print(f"  matches able to supply each level "
+          f"(read on the {'LAST' if G.LEVEL_AT == 'end' else 'FIRST'} frame):")
+    for n in G.LEVELS:
         ms = len(lv.get(n, ()))
         print(f"    {n:>3}: {ms:>3} matches  {'#' * min(ms, 60)}"
               + ("   <-- SHORT" if ms < 2 else ""))
-    extra = {k: len(v) for k, v in sorted(lv.items()) if k not in G.START_COUNTS}
+    extra = {k: len(v) for k, v in sorted(lv.items()) if k not in G.LEVELS}
     if extra:
         print("  (levels outside the spec, for reference:", extra, ")")
     return 0
@@ -506,7 +509,7 @@ def _ends_wanted(match):
     count is a level the batch actually wants. Everything else cannot be selected, so
     paying a plate frame for it is waste."""
     rows = [w for w in json.loads(WINDOWS.read_text())
-            if w["match"] == match and w["count"] in G.START_COUNTS]
+            if w["match"] == match and w["count"] in G.LEVELS]
     ends = sorted({w["end"] - 1 for w in rows})
     if len(ends) <= MAX_ENDS:
         return ends
@@ -577,7 +580,7 @@ def _pool():
     pool, blocked, nocell = [], 0, 0
     pix = {}
     for w in json.loads(WINDOWS.read_text()):
-        if w["count"] not in G.START_COUNTS:
+        if w["count"] not in G.LEVELS:
             continue
         if w["match"] not in pix:
             f = PIX / f"{w['match']}.json"
@@ -608,14 +611,14 @@ def cmd_select(argv):
     lv = {}
     for c in pool:
         lv.setdefault(c["count"], set()).add(c["match"])
-    print("  matches per opening level:",
-          {n: len(lv.get(n, ())) for n in G.START_COUNTS})
+    print(f"  matches per level ({'closing' if G.LEVEL_AT == 'end' else 'opening'}"
+          f" count):", {n: len(lv.get(n, ())) for n in G.LEVELS})
 
     # No class quota: capacity 24 on every class makes the class layer inert while
     # leaving the network — and so the "one clip per match" and level constraints —
     # exactly as they were.
-    quota = {k: G.PER_COUNT * len(G.START_COUNTS) for k in CLASS_ORDER}
-    picks, report = gen3_assign.solve(pool, G.START_COUNTS, G.PER_COUNT, quota)
+    quota = {k: G.PER_COUNT * len(G.LEVELS) for k in CLASS_ORDER}
+    picks, report = gen3_assign.solve(pool, G.LEVELS, G.PER_COUNT, quota)
     if not picks:
         print("\nINFEASIBLE:")
         print(json.dumps(report, indent=2))
@@ -627,9 +630,11 @@ def cmd_select(argv):
     mix = {}
     for c in picks:
         mix[c["kind"]] = mix.get(c["kind"], 0) + 1
-    print(f"\n{'clip':<8}{'opens':>6}{'ends':>6} {'class':<9}{'cell':>5} {'coh':>6}  match")
+    print(f"\n{'clip':<8}{'opens':>6}{'ends':>6} {'class':<9}{'cell':>5} "
+          f"{'coh':>6}  match      (the level is the "
+          f"{'ending' if G.LEVEL_AT == 'end' else 'opening'} count)")
     for c in picks:
-        print(f"{c['clip']:<8}{c['count']:>6}{c['count_end']:>6} {c['kind']:<9}"
+        print(f"{c['clip']:<8}{c['count_first']:>6}{c['count_last']:>6} {c['kind']:<9}"
               f"{c['cell']:>5} {c['coh']:>6.2f}  {c['match']}")
     print("\nsituation mix that fell out:", mix)
     return 0
@@ -877,9 +882,9 @@ def cmd_trace(argv):
 
 
 # ══ phase 8: compose ═══════════════════════════════════════════════════════════
-# players_in_frame_FIRST is the level here, and it is named for the frame it is read
-# from: GEN3's column was `players_in_frame_last`, and a reader who assumes the name
-# carried over would be off by however much the count drifts across five seconds.
+# Both ends are published and both are named for the frame they are read from. The LEVEL
+# is `players_in_frame_last` (see gen4_lib.LEVEL_AT) — the same frame the ball answer is
+# read from, so the count and the answer describe one instant.
 HEADER = ("clip,situation,players_in_frame_first,players_in_frame_last,players_in_play,"
           "players_hidden,start_team,start_team_colour,"
           "ball_final_cell,final_px,final_py,ball_start_cell,start_px,start_py,"
@@ -907,15 +912,15 @@ def cmd_compose(argv):
         G.write_clip(split, G.OUT / "split_1s_4s" / f"{p['clip']}.mov")
         p["final_cell_measured"] = G.cell_of(fpx, fpy)
         rows.append(",".join(map(str, [
-            p["clip"], p["kind"], p["count"], p["count_end"], 22, 0,
+            p["clip"], p["kind"], p["count_first"], p["count_last"], 22, 0,
             *TEAM_NAME[p["startown"]],
             G.cell_of(fpx, fpy), round(fpx, 1), round(fpy, 1),
             G.cell_of(spx, spy), round(spx, 1), round(spy, 1),
             p["offset_x"], p["offset_y"], p["shape"], p["seed"], p["match"],
             p["start"], p["end"], len(full), round(len(full) / G.FPS, 2),
             p["loose"], p["apex"], p["dnear"], p["path"], p["coh"]])))
-        print(f"  [compose] {p['clip']}: opens with {p['count']} people, ends with "
-              f"{p['count_end']}, {p['kind']}, "
+        print(f"  [compose] {p['clip']}: opens with {p['count_first']} people, ends "
+              f"with {p['count_last']}, {p['kind']}, "
               f"ball {G.cell_of(spx, spy)} -> {G.cell_of(fpx, fpy)}", flush=True)
     (G.OUT / "ground_truth.csv").write_text("\n".join(rows) + "\n")
     PICKS.write_text(json.dumps(picks, indent=2))

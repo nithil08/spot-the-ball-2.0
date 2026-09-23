@@ -92,8 +92,17 @@ SETPIECE_MODES = (GM_KICKOFF, GM_GOALKICK, GM_FREEKICK, GM_CORNER, GM_THROWIN, G
 ALL_SLOTS = [f"{t}{i}" for t in ("L", "R") for i in range(11)]
 
 # ── the count targets ───────────────────────────────────────────────────────────
-START_COUNTS = list(range(8, 20))      # 12 levels, read on the FIRST frame
+LEVELS = list(range(8, 20))            # 12 levels, two clips each
 PER_COUNT = 2                          # 24 clips
+
+# WHICH FRAME THE LEVEL IS READ FROM. "end" is the batch's spec — two plays ENDING with
+# each of 8..19 — and it is also the frame the ball answer is read from, so the count and
+# the answer describe the same instant. "start" is supported because the probe measures
+# both ends of every window at no extra cost; switching is a re-run of `windows` and
+# `select`, never of the probe.
+LEVEL_AT = "end"
+
+START_COUNTS = LEVELS                  # kept as an alias: older callers used this name
 
 # No quota. See (2) at the top of this file: the opening headcount and the situation are
 # not independent, so a quota on top of the level spec makes most levels unreachable.

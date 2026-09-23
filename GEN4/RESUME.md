@@ -1,7 +1,11 @@
-# GEN4 — 24 clips levelled by the OPENING headcount
+# GEN4 — 24 clips, two ending with each headcount 8..19
 
-Started 23 Sep 2026. GEN3_HARD's football, turned around: the level is the number of
-people in shot on the FIRST frame, not the last.
+Started 23 Sep 2026. GEN3_HARD's spec, rebuilt so the levels actually hold: two plays
+ENDING with 8 people in shot, two ending with 9, up to 19.
+
+The level axis is a setting (`gen4_lib.LEVEL_AT`, "end" or "start"), because the probe
+measures both ends of every candidate window at no extra cost. Switching it is a re-run of
+`windows` and `select` — a couple of minutes — and never of the probe.
 
 Read `../GEN3/RESUME.md` and `../GEN3_HARD/RESUME.md` first. The engine plumbing, the
 bundle rule, the leak workaround, the camera-offset reasoning and the locked 16x6 noname
@@ -13,7 +17,7 @@ replays no match to build its plan.
 | | |
 |---|---|
 | 24 clips | 12 levels x 2 |
-| Level | **people in shot on the FIRST frame**, exactly 8, 9, 10 ... 19, two clips each |
+| Level | **people in shot on the LAST frame**, exactly 8, 9, 10 ... 19, two clips each (`LEVEL_AT`) |
 | Situation mix | **not commanded** — reported (see below) |
 | Ball | must be in the camera's view on EVERY frame; final-frame cell spread over the 16x6 grid |
 | Format | 125 frames @ 25 fps = 5.0 s, 16x6 grid, noname, `full_visibility` + `split_1s_4s` from ONE render pair |
@@ -21,14 +25,16 @@ replays no match to build its plan.
 
 ## The four things GEN4 does differently, and why each one exists
 
-**1. The level is the first frame.** Asked for directly: "two plays where it starts with
-8 people, and then 9, and then 10". The final count is free and is recorded alongside.
+**1. The levels actually hold.** GEN3_HARD claimed 8..19 twice on the closing frame and
+did not deliver it — re-measured, level 15 was empty, 16 held four clips and one clip sat
+at 7, because the counts it selected on were wrong. Same spec here, with a count rule that
+survives measurement. Both ends are published; the level is the closing one.
 
-**2. No situation quota.** It cannot be held at 5/5/5/9 on top of the level spec. Measured
-on GEN3_HARD's own clips: a corner opens with 3-4 people in shot because the camera has to
-frame the corner arc, a kick-off opens with 11-13 because both elevens are at the halfway
-line, a keeper clip with 10-14. Only open play spans 8 to 19. Forcing both makes most
-levels unreachable, so the level wins and `verify_gen4.py` prints the mix that fell out.
+**2. No situation quota.** GEN3_HARD held 5/5/5/9 and could do so because its pool was
+planned around it; here the level is the binding constraint and the mix is left free, so
+the search is never forced to spend a scarce corner on a level open play could have
+covered. `verify_gen4.py` prints the mix that fell out. (If the quota matters more than
+the levels, that is a different batch and worth saying so before it is built.)
 
 **3. The ball must be in the camera's view on every frame.** GEN3_HARD checked the first
 and last frames only and exempted the middle, on the grounds that a ball behind a defender
@@ -66,7 +72,7 @@ were wrong**, six short by a body clipped by the frame edge and two counting sha
 ```
 python3 gen4.py shortlist          # 600 distinct matches (free, reads GEN3_HARD's sweep)
 python3 gen4.py plan               # 60 matches, one camera offset each  [--more N]
-bash run_phase.sh probe 3          # 23 replays/match, counts on a 5-frame grid  << the cost
+bash run_phase.sh probe 3          # 23 replays/match, counts on a 4-frame grid  << the cost
 python3 gen4.py windows            # legal windows joined to their counts (free)
 bash run_phase.sh ballpix_vis 3    # plate frames at candidate end frames
 bash run_phase.sh ballpix_inv 3    # ball pixel, from the plate pair
@@ -82,12 +88,16 @@ python3 verify_gen4.py
 23 replays each, ~6 minutes, and everything downstream is cheap. `select` reports which
 levels are short; only then is `plan --more N` worth paying for.
 
-Unlike GEN3's probe, this one keeps a **5-frame grid across the whole replay** rather than
-a dozen end frames. Replay is the entire cost and kept frames are free, so one probe now
-answers both ends of every window the match could ever supply — which is what makes a
-level on the opening frame affordable at all.
+Unlike GEN3's probe, this one keeps a **4-frame grid across the whole replay** rather than
+a dozen end frames. Replay is the entire cost and kept frames are free, so one probe
+answers BOTH ends of every window the match could ever supply — which is what makes the
+level axis a setting rather than a rebuild.
+
+The grid is 4 and not 5, and the number is load-bearing: a window is 125 frames, so its
+last frame sits 124 after its first. 124 is divisible by 4 and not by 5, so on a 5-grid
+every window would have its opening frame measured and its closing frame missed.
 
 ## Status
 
 * 23 Sep 2026 — shortlist (600 matches) and plan (60 matches, 12 shapes) done; probe
-  running across 3 shards.
+  running across 3 shards. Level axis set to the CLOSING count.
