@@ -4,6 +4,13 @@ Every assertion here is made against the RENDERED CLIPS or the frames they were 
 not against the plan that produced them. A pipeline that reports its own intentions back
 is worth nothing; the point is to catch the case where intent and output diverged.
 
+Two checks used to break that rule and passed while the batch was wrong. The player count
+was read from `picks.json["count"]` — the TARGET the selector was aiming at — so it
+reported 8..19 twice even after the re-measurement found nine of those counts wrong. And
+"one clip per match" compared match NAMES, which cannot see that `mid_bal`, `mid_even` and
+`mid_even2` are one scenario spec under three names, so three clips of one kick-off looked
+like three matches. Both now read the shipped ground truth and the logged play.
+
     python3 verify_gen3.py            # all checks + contact sheets
     python3 verify_gen3.py recheck N  # re-probe N clips end to end (23 replays each)
 
@@ -14,6 +21,7 @@ WHAT `recheck` IS FOR
   and the probe ever disagree (a stale scenario file, an env var not set on one path, a
   cache keyed wrongly), this is what finds it.
 """
+import csv
 import json
 import sys
 from pathlib import Path
@@ -66,9 +74,15 @@ def check(picks):
     print("\n== spec ==")
     want("24 situations", len(picks) == 24, f"got {len(picks)}")
 
-    counts = sorted(p["count"] for p in picks)
+    # From the SHIPPED KEY, which is what a consumer of the batch reads, never from the
+    # selector's target.
+    key = {r["clip"]: r for r in csv.DictReader(open(HERE / "clips/ground_truth.csv"))}
+    counts = sorted(int(key[p["clip"]]["players_in_frame_last"]) for p in picks)
     expect = sorted(c for c in G.END_COUNTS for _ in range(G.PER_COUNT))
-    want("counts are 8..19, two each", counts == expect, f"got {counts}")
+    per = {c: counts.count(c) for c in sorted(set(counts))}
+    short = [c for c in G.END_COUNTS if counts.count(c) != G.PER_COUNT]
+    want("counts are 8..19, two each", counts == expect,
+         f"got {per}" + (f"; off-spec levels {short}" if short else ""))
 
     kinds = {}
     for p in picks:
@@ -81,18 +95,34 @@ def check(picks):
     # red, which is exactly the imbalance this constraint exists to remove.
     by_count = {}
     for p in picks:
-        by_count.setdefault(p["count"], []).append(p.get("startown", -1))
-    uneven = {c: v for c, v in by_count.items() if sorted(v) != [0, 1]}
-    want("each count has one blue-start and one red-start clip", not uneven,
-         f"uneven levels {uneven}" if uneven else "")
+        lvl = int(key[p["clip"]]["players_in_frame_last"])
+        by_count.setdefault(lvl, []).append(p.get("startown", -1))
+    # Only a level holding exactly two clips can be split one and one; a level with one
+    # or three cannot, and flagging it as uneven would be an artefact of the count
+    # distribution rather than a fact about the starting teams.
+    uneven = {c: v for c, v in by_count.items() if len(v) == 2 and sorted(v) != [0, 1]}
+    odd = {c: len(v) for c, v in by_count.items() if len(v) != 2}
+    want("every two-clip level has one blue start and one red start", not uneven,
+         (f"uneven {uneven}" if uneven else "")
+         + (f"  (levels not holding two clips: {odd})" if odd else ""))
     tot = sorted(p.get("startown", -1) for p in picks)
     want("starting team is 12 blue / 12 red",
          tot.count(0) == 12 and tot.count(1) == 12,
          f"got blue {tot.count(0)} red {tot.count(1)}")
 
-    matches = {p["match"] for p in picks}
-    want("one clip per match", len(matches) == len(picks),
-         f"{len(matches)} distinct matches")
+    # By the PLAY, not the match name: identical ball tracks mean one match under two
+    # names, and overlapping windows on it mean two clips of the same passage of play.
+    shared = {}
+    for i, a in enumerate(picks):
+        ba = np.load(G.SWEEP / f"{a['match']}.npz")["ball"]
+        for b in picks[i + 1:]:
+            bb = np.load(G.SWEEP / f"{b['match']}.npz")["ball"]
+            if len(ba) != len(bb) or np.abs(ba - bb).max() > 1e-6:
+                continue
+            if min(a["end"], b["end"]) > max(a["start"], b["start"]):
+                shared.setdefault(a["clip"], []).append(b["clip"])
+    want("one clip per passage of play", not shared,
+         f"shared play {shared}" if shared else f"{len(picks)} distinct passages")
 
     want("nobody hidden", all(p.get("players_hidden", 0) == 0 for p in picks))
 

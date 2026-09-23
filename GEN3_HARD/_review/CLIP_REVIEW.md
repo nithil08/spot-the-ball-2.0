@@ -87,8 +87,10 @@ Re-measured from the shipped renders, not from the pipeline's targets. Every num
 * **Continuity.** No goal, no teleport, no respot inside any of the 24 windows.
 * **Restarts are shown.** Every restart is inside its clip and, in 14 of the 15 restart clips, the player taking it is in shot as he takes it. clip_08 is the exception — the corner taker is outside the frame.
 
-## Not yet changed
+## What was changed
 
-`clips/ground_truth.csv` and `clips/clip_classification.csv` still carry the old counts. Which number belongs in an answer key is a judgement — every body with pixels in the frame, or only the ones not clipped by the edge — and that choice has to be made before the key is rewritten. Both columns are in `clip_review.csv`. The clips themselves are untouched.
+`clips/ground_truth.csv` and `clips/clip_classification.csv` now carry the measured count, under the rule at the top of this file: a person is in shot if any part of their body has pixels in the frame. The count as first published is kept in `clips/ground_truth.superseded_2026-09-21.csv`, and both columns are in `clip_review.csv`, so the change is reversible and auditable. Every `players_in_frame_last` is now reproducible with `verify_final_frame.py`.
+
+Both files also gained a `same_play_as` column naming the clips that share a passage of play, so the three copies of one kick-off cannot be mistaken for three independent samples. The clips themselves are untouched.
 
 Files: `clip_review.csv` (the table), `annotated/clip_XX.png` (the final frame with a box round every person counted), `player_counts.png` (the corrected chart), `count_distribution.png` (the levels the batch really covers).

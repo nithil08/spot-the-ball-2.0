@@ -21,6 +21,49 @@ midfield open matches — `mid_r` and `mid_push`, the only shapes that ever reac
 were added to the plan and probed, which restored it to 4 matches at 19 and a feasible
 assignment. Cost about 40 minutes of probe across 3 shards.
 
+## RE-MEASURED 2026-09-22 — the player counts were wrong, and the levels do not hold
+
+The headline claim ("end-frame player count exactly 8..19, two clips each") did not
+survive a re-measurement. `verify_final_frame.py` re-ran the solo probe on the final frame
+of all 24 clips at FULL resolution, keeping a pixel mask per player, and found **nine of
+the 24 published counts wrong** — four too low, and two (clip_04, clip_13) counting the
+shadows of players who are outside the frame.
+
+The cause is the probe's resolution, not its method. `probe` and `trace` render at
+`down=2` and require 40 changed pixels, which is about 160 at full size: more than a
+player half out of frame leaves behind, and less than the shadow of one entirely out of
+it. Full resolution with body pixels separated from shadow is exact; see
+`_review/CLIP_REVIEW.md` and the per-clip evidence in `_review/annotated/`.
+
+What this costs the batch:
+
+* the count distribution is now `7×1, 8×2, 9×1, 10×1, 11×2, 12×2, 13×3, 14×2, 16×4,
+  17×2, 18×2, 19×2` — **level 15 is empty** and clip_04 sits at 7, outside the design
+  range. `verify_gen3.py` now FAILS this check instead of passing it on the selector's
+  target.
+* three levels no longer hold one blue-start and one red-start clip, because the clips
+  moved level.
+* **clips 06, 15 and 19 are the same kick-off.** `mid_bal`, `mid_even` and `mid_even2`
+  are three names for ONE scenario spec (ball (0,0), offsides on, difficulty 0.95, no
+  push), so one seed replays bit-identically under each and the one-clip-per-match rule,
+  which compared match names, never saw it. 06 and 15 are the same 125 frames; 19 is the
+  same match five frames earlier. All three are kept, tagged `same_play_as` in
+  `ground_truth.csv` and `clip_classification.csv`. **Fix the shape table before building
+  another batch** — three identical specs waste a third of the mid-pitch search and defeat
+  the diversity rule.
+
+`ground_truth.csv` now carries the measured count under the stated rule (a person is in
+shot if any part of their BODY has pixels in the frame); the count as first published is
+kept in `ground_truth.superseded_2026-09-21.csv`. Re-picking windows to restore 8..19
+twice was NOT done — it needs a fresh selection pass over the probe cache at the corrected
+counts.
+
+What the re-measurement did NOT find: the ball ground truth is exact (all 24 final ball
+pixels reproduce from the shipped renders and agree within 2 px with the occlusion-free
+plate), all 24 situation labels are right, no window contains a goal, a respot or an
+awarded set piece, and 14 of the 15 restarts are taken by a player who is in shot
+(clip_08's corner taker is outside the frame).
+
 ## What is identical to GEN3
 
 | | |

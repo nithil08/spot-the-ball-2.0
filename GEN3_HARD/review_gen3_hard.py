@@ -56,9 +56,19 @@ SOFT = "#b08b2e"        # amber  — published number differs only by a body cli
                         #          the frame edge
 
 
+SUPERSEDED = CLIPS / "ground_truth.superseded_2026-09-21.csv"
+
+
 def load():
+    """Every clip, its re-measurement, and the count that was published BEFORE the fix.
+
+    The comparison reads the superseded key, not the live one. Once the live key is
+    corrected the two agree, and a review that compared against it would report a clean
+    bill of health and quietly lose the record of what was wrong.
+    """
     picks = json.loads(PICKS.read_text())
-    gt = {r["clip"]: r for r in csv.DictReader(open(CLIPS / "ground_truth.csv"))}
+    key = SUPERSEDED if SUPERSEDED.exists() else CLIPS / "ground_truth.csv"
+    gt = {r["clip"]: r for r in csv.DictReader(open(key))}
     rows = []
     for p in picks:
         f = FINAL / f"{p['clip']}.npz"
@@ -290,9 +300,9 @@ def chart(rows):
         plt.Line2D([], [], color="#cde2fb", lw=7, solid_capstyle="round",
                    label="range during the clip"),
         plt.Line2D([], [], marker="x", ls="", ms=9, mew=2.2, color=FLAG,
-                   label="published count, wrong under any definition"),
+                   label="count as first published, wrong under any definition"),
         plt.Line2D([], [], marker="x", ls="", ms=9, mew=2.2, color=SOFT,
-                   label="published count, misses a body clipped by the frame edge"),
+                   label="count as first published, missing a body at the frame edge"),
     ]
     ax.legend(handles=handles, ncol=2, loc="lower left", frameon=False, fontsize=8.5,
               bbox_to_anchor=(-0.005, 1.012), handletextpad=0.6, columnspacing=2.2,
@@ -306,9 +316,12 @@ def chart(rows):
              "GEN3_HARD, re-measured — a person is counted by hiding that one player and "
              "diffing the render, at full resolution and at each clip's own offset.",
              fontsize=9, color=INK2)
+    fixed = SUPERSEDED.exists()
     fig.text(0.042, 0.920,
-             f"{n_wrong} of 24 published counts are wrong outright and {n_soft} more "
-             "miss a body clipped by the frame edge.",
+             f"{n_wrong} of 24 counts were wrong outright and {n_soft} more missed a "
+             "body clipped by the frame edge"
+             + (" — the answer key now carries the measured column."
+                if fixed else "."),
              fontsize=9, color=FLAG if n_wrong else INK2)
     dup_names = sorted({c for r in rows for c, _ in r["dup"]}
                        | {r["clip"] for r in rows if r["dup"]})
@@ -593,12 +606,17 @@ def markdown(rows, wrong):
       "restart clips, the player taking it is in shot as he takes it. clip_08 is the "
       "exception — the corner taker is outside the frame.")
     A("")
-    A("## Not yet changed\n")
-    A("`clips/ground_truth.csv` and `clips/clip_classification.csv` still carry the old "
-      "counts. Which number belongs in an answer key is a judgement — every body with "
-      "pixels in the frame, or only the ones not clipped by the edge — and that choice "
-      "has to be made before the key is rewritten. Both columns are in "
-      "`clip_review.csv`. The clips themselves are untouched.")
+    A("## What was changed\n")
+    A("`clips/ground_truth.csv` and `clips/clip_classification.csv` now carry the "
+      "measured count, under the rule at the top of this file: a person is in shot if "
+      "any part of their body has pixels in the frame. The count as first published is "
+      "kept in `clips/ground_truth.superseded_2026-09-21.csv`, and both columns are in "
+      "`clip_review.csv`, so the change is reversible and auditable. Every "
+      "`players_in_frame_last` is now reproducible with `verify_final_frame.py`.")
+    A("")
+    A("Both files also gained a `same_play_as` column naming the clips that share a "
+      "passage of play, so the three copies of one kick-off cannot be mistaken for "
+      "three independent samples. The clips themselves are untouched.")
     A("")
     A("Files: `clip_review.csv` (the table), `annotated/clip_XX.png` (the final frame "
       "with a box round every person counted), `player_counts.png` (the corrected "

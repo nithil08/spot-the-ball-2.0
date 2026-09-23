@@ -10,8 +10,13 @@ shipped ground truth, and runs no engine. Re-running it cannot change the batch.
 
 WHERE EACH NUMBER COMES FROM, because they are not equally hard-won
   ball cell / pixel   measured in `compose` from the shipped render pair
-  players in frame    measured by the 23-pass solo probe (`trace`) at the shipping
-                      camera offset — the only exact method; see gen3.py
+  players in frame    measured by the 23-pass solo probe at the shipping camera offset —
+                      the only exact method; see gen3.py. The START/MIN/MAX come from
+                      `trace`, which runs at half resolution; the END count, which is the
+                      batch's headline number, comes from `verify_final_frame.py` at full
+                      resolution and counts bodies only. So a row CAN show an end count
+                      above its own max: the coarse pass misses a body clipped by the
+                      frame edge. Do not "fix" that by reverting the end count.
   everything else     the sweep log, which is camera-independent: ball xyz, per-player
                       xy, possession, game mode, score, at 25 fps
 
@@ -110,6 +115,21 @@ def near_ball(row, i):
     return int((np.linalg.norm(pl - row["ball"][i][:2], axis=1) < NEAR).sum())
 
 
+FINAL = G.CACHE / "finalframe"
+FINAL_MIN_PIX = 20          # matches review_gen3_hard.py; a body, not a shadow
+
+
+def final_frame_count(r):
+    """People in shot on the last frame, from the full-resolution solo probe."""
+    f = FINAL / f"{r['clip']}.npz"
+    if not f.exists():
+        raise SystemExit(f"{f} is missing — run `python3 verify_final_frame.py` first; "
+                         "the end count must not fall back to the half-res trace")
+    rec = json.loads(str(np.load(f, allow_pickle=True)["rec"]))
+    return sum(1 for s in rec["slots"]
+               if s["pix"] >= FINAL_MIN_PIX and s.get("body_pix", 0) >= FINAL_MIN_PIX)
+
+
 def crowding(n):
     return "isolated" if n < 2 else ("contested" if n < 5 else "crowded")
 
@@ -166,7 +186,32 @@ def describe(r):
     return "; ".join(bits) + "."
 
 
+def mark_duplicates(rows):
+    """Tag clips that are the same passage of play as another clip.
+
+    Not by match name: `mid_bal`, `mid_even` and `mid_even2` are three names for one
+    scenario spec, so one seed replays bit-identically under each and three clips can
+    share a kick-off while looking like three different matches. Compare the logged ball
+    track, which is the thing that would have to differ for the play to be different.
+    """
+    for r in rows:
+        r["dup"] = []
+    for i, a in enumerate(rows):
+        for b in rows[i + 1:]:
+            if len(a["ball"]) != len(b["ball"]):
+                continue
+            za = np.load(SWEEP / f"{a['match']}.npz")["ball"]
+            zb = np.load(SWEEP / f"{b['match']}.npz")["ball"]
+            if len(za) != len(zb) or np.abs(za - zb).max() > 1e-6:
+                continue
+            if min(a["end"], b["end"]) > max(a["start"], b["start"]):
+                a["dup"].append(b["clip"])
+                b["dup"].append(a["clip"])
+    return rows
+
+
 def classify(rows):
+    mark_duplicates(rows)
     for r in rows:
         b, own = r["ball"], r["owned"]
         step = np.diff(b[:, :2], axis=0) * (MX, MY)
@@ -193,9 +238,14 @@ def classify(rows):
         r["restart_visible"] = bool(r["start"] <= r["anchor"] < r["end"])
         t = r["trace"]
         r["count_start"] = int(t[0]) if t is not None else None
-        r["count_end"] = int(t[-1]) if t is not None else int(r["count"])
         r["count_min"] = int(t.min()) if t is not None else None
         r["count_max"] = int(t.max()) if t is not None else None
+        # The END count is the batch's headline number, so it does NOT come from the
+        # half-resolution trace: at down=2 a 40-pixel floor is ~160 pixels at full size,
+        # which drops a player half out of frame and admits the shadow of one entirely
+        # out of it. verify_final_frame.py re-measures that one frame at full resolution
+        # and separates body pixels from shadow; see _review/CLIP_REVIEW.md.
+        r["count_end"] = final_frame_count(r)
         r["description"] = describe(r)
     return rows
 
@@ -238,6 +288,9 @@ FIELDS = [
     ("end_frame", lambda r: r["end"]),
     ("camera_offset_x", lambda r: r["offset_x"]),
     ("camera_offset_y", lambda r: r["offset_y"]),
+    # mid_bal, mid_even and mid_even2 are one scenario spec under three names, so a
+    # (shape, seed) pair is not a match identity and three clips share one kick-off.
+    ("same_play_as", lambda r: " ".join(r.get("dup", []))),
 ]
 
 
