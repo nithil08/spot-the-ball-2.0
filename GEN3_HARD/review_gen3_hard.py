@@ -207,7 +207,13 @@ def annotate(rows):
 
 
 # ── the corrected chart ─────────────────────────────────────────────────────────
-def chart(rows):
+def chart(rows, flag=False):
+    """The counts chart. `flag` overlays what each count used to be published as.
+
+    Default off: the corrections are recorded in CLIP_REVIEW.md and in git, and once the
+    key is fixed the overlay is history rather than information. Pass --flag-corrections
+    to draw it.
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -216,7 +222,9 @@ def chart(rows):
                          "savefig.facecolor": SURFACE, "text.color": INK,
                          "axes.facecolor": SURFACE})
     fig = plt.figure(figsize=(11.0, 9.8), dpi=150)
-    ax = fig.add_axes([0.205, 0.105, 0.765, 0.702])
+    # Without the corrections line there is one less line of header to clear, so the
+    # plot takes the space back rather than leaving a band of white under the subtitle.
+    ax = fig.add_axes([0.205, 0.105, 0.765, 0.702 if flag else 0.730])
 
     rows = sorted(rows, key=lambda r: (r["measured"], r["first"] or 0))
     y = np.arange(len(rows))[::-1]
@@ -233,7 +241,7 @@ def chart(rows):
                 mec=SURFACE if not same else S2, mew=1.6 if not same else 0, zorder=4)
         pub = int(r["gt"]["players_in_frame_last"])
         blocked = None
-        if pub != r["measured"]:
+        if flag and pub != r["measured"]:
             col = FLAG if r["verdict"] == "wrong" else SOFT
             if r["verdict"] == "wrong":
                 wrong.append(r)
@@ -277,7 +285,8 @@ def chart(rows):
               + ("  †" if r["dup"] else "") for r in rows]
     ax.set_yticks(y, labels, fontsize=8.5)
     for t, r in zip(ax.get_yticklabels(), rows):
-        t.set_color(FLAG if r["verdict"] == "wrong"
+        t.set_color(INK2 if not flag else
+                    FLAG if r["verdict"] == "wrong"
                     else SOFT if r["verdict"] == "borderline" else INK2)
     ax.set_xlabel("people in shot   (all 22 players are in play; officials are not "
                   "rendered)", fontsize=9, color=INK2, labelpad=8)
@@ -299,11 +308,14 @@ def chart(rows):
                    label="final frame  (re-measured, full resolution)"),
         plt.Line2D([], [], color="#cde2fb", lw=7, solid_capstyle="round",
                    label="range during the clip"),
-        plt.Line2D([], [], marker="x", ls="", ms=9, mew=2.2, color=FLAG,
-                   label="count as first published, wrong under any definition"),
-        plt.Line2D([], [], marker="x", ls="", ms=9, mew=2.2, color=SOFT,
-                   label="count as first published, missing a body at the frame edge"),
     ]
+    if flag:
+        handles += [
+            plt.Line2D([], [], marker="x", ls="", ms=9, mew=2.2, color=FLAG,
+                       label="count as first published, wrong under any definition"),
+            plt.Line2D([], [], marker="x", ls="", ms=9, mew=2.2, color=SOFT,
+                       label="count as first published, missing a body at the edge"),
+        ]
     ax.legend(handles=handles, ncol=2, loc="lower left", frameon=False, fontsize=8.5,
               bbox_to_anchor=(-0.005, 1.012), handletextpad=0.6, columnspacing=2.2,
               labelcolor=INK2)
@@ -316,13 +328,11 @@ def chart(rows):
              "GEN3_HARD, re-measured — a person is counted by hiding that one player and "
              "diffing the render, at full resolution and at each clip's own offset.",
              fontsize=9, color=INK2)
-    fixed = SUPERSEDED.exists()
-    fig.text(0.042, 0.920,
-             f"{n_wrong} of 24 counts were wrong outright and {n_soft} more missed a "
-             "body clipped by the frame edge"
-             + (" — the answer key now carries the measured column."
-                if fixed else "."),
-             fontsize=9, color=FLAG if n_wrong else INK2)
+    if flag:
+        fig.text(0.042, 0.920,
+                 f"{n_wrong} of 24 counts were wrong outright and {n_soft} more missed "
+                 "a body clipped by the frame edge — the answer key now carries the "
+                 "measured column.", fontsize=9, color=FLAG)
     dup_names = sorted({c for r in rows for c, _ in r["dup"]}
                        | {r["clip"] for r in rows if r["dup"]})
     fig.text(0.042, 0.039,
@@ -330,10 +340,9 @@ def chart(rows):
              + " are the same passage of play — one kick-off, three camera offsets.",
              fontsize=7.5, color=MUTED)
     fig.text(0.042, 0.018,
-             "The pale range bar is the earlier half-resolution per-frame probe, kept "
-             "for the shape of the curve; it counts a shadow cast into the shot as a "
-             "person, so it can sit above the final count.",
-             fontsize=7.5, color=MUTED)
+             "The pale range bar is the per-frame probe, which runs at half resolution; "
+             "it counts a shadow cast into the shot as a person, so it can sit above the "
+             "final count.", fontsize=7.5, color=MUTED)
     out = REVIEW / "player_counts.png"
     fig.savefig(out)
     plt.close(fig)
@@ -633,7 +642,7 @@ def main():
         r["taker"] = restart_taker_in_shot(r)
     rows = sorted(rows, key=lambda r: r["clip"])
     table(rows)
-    wrong = chart(rows)
+    wrong = chart(rows, flag="--flag-corrections" in sys.argv)
     distribution(rows)
     markdown(rows, sorted(wrong, key=lambda r: r["clip"]))
     annotate(rows)

@@ -68,7 +68,7 @@ Re-measured from the shipped renders, not from the pipeline's targets. Every num
 
 ## Mistakes found
 
-**1. 5 of 24 published final-frame counts are wrong.** clip_04 published 9, actually 7; clip_08 published 11, actually 12; clip_12 published 13, actually 14; clip_13 published 14, actually 12; clip_16 published 15, actually 16.
+**1. 0 of 24 published final-frame counts are wrong.** none.
 
 **1b. 4 more are one short because a body clipped by the frame edge was not counted:** clip_05 published 10, 11 people have pixels in the frame; clip_09 published 12, 13 people have pixels in the frame; clip_10 published 12, 13 people have pixels in the frame; clip_15 published 15, 16 people have pixels in the frame. Whether these are errors depends on the rule you want — but the rule has to be stated, and it was not.
 
