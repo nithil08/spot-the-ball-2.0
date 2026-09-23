@@ -1,0 +1,1 @@
+./run_phase.sh: line 21: 72715 Killed: 9               nice -n "$NICE" python3 "$HERE/gen4.py" "$PHASE" --shard "$i/$N" >> "$LOGS/${PHASE}_$i.log" 2>&1

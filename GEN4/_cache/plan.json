@@ -1,5 +1,981 @@
 [
  {
+  "match": "boxR_s335",
+  "file": "boxR_s335",
+  "shape": "boxR",
+  "seed": 335,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 338
+  },
+  "kind": "corner",
+  "offset_x": 0.0,
+  "offset_y": 0.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxR_s347",
+  "file": "boxR_s347",
+  "shape": "boxR",
+  "seed": 347,
+  "kinds": {
+   "corner": 2,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 347
+  },
+  "kind": "corner",
+  "offset_x": -12.0,
+  "offset_y": 6.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "countL_s339",
+  "file": "countL_s339",
+  "shape": "countL",
+  "seed": 339,
+  "kinds": {
+   "corner": 6,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 203
+  },
+  "kind": "corner",
+  "offset_x": 12.0,
+  "offset_y": -5.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "countL_s346",
+  "file": "countL_s346",
+  "shape": "countL",
+  "seed": 346,
+  "kinds": {
+   "corner": 1,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 230
+  },
+  "kind": "corner",
+  "offset_x": -20.0,
+  "offset_y": 10.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "countR_s315",
+  "file": "countR_s315",
+  "shape": "countR",
+  "seed": 315,
+  "kinds": {
+   "corner": 2,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 287
+  },
+  "kind": "corner",
+  "offset_x": 20.0,
+  "offset_y": -9.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "flankR_s337",
+  "file": "flankR_s337",
+  "shape": "flankR",
+  "seed": 337,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 187
+  },
+  "kind": "corner",
+  "offset_x": -6.0,
+  "offset_y": 3.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s321",
+  "file": "mid_bal_s321",
+  "shape": "mid_bal",
+  "seed": 321,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 2,
+   "open": 281
+  },
+  "kind": "corner",
+  "offset_x": 6.0,
+  "offset_y": -2.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s322",
+  "file": "mid_bal_s322",
+  "shape": "mid_bal",
+  "seed": 322,
+  "kinds": {
+   "corner": 1,
+   "gk_throw": 0,
+   "kickoff": 2,
+   "open": 316
+  },
+  "kind": "corner",
+  "offset_x": -24.0,
+  "offset_y": 8.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s323",
+  "file": "mid_bal_s323",
+  "shape": "mid_bal",
+  "seed": 323,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 5,
+   "open": 299
+  },
+  "kind": "corner",
+  "offset_x": 24.0,
+  "offset_y": -7.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s343",
+  "file": "mid_bal_s343",
+  "shape": "mid_bal",
+  "seed": 343,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 8,
+   "open": 227
+  },
+  "kind": "corner",
+  "offset_x": -16.0,
+  "offset_y": 0.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_push_s329",
+  "file": "mid_push_s329",
+  "shape": "mid_push",
+  "seed": 329,
+  "kinds": {
+   "corner": 2,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 111
+  },
+  "kind": "corner",
+  "offset_x": 16.0,
+  "offset_y": 6.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_r_s323",
+  "file": "mid_r_s323",
+  "shape": "mid_r",
+  "seed": 323,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 318
+  },
+  "kind": "corner",
+  "offset_x": 0.0,
+  "offset_y": -5.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_r_s331",
+  "file": "mid_r_s331",
+  "shape": "mid_r",
+  "seed": 331,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 225
+  },
+  "kind": "corner",
+  "offset_x": -12.0,
+  "offset_y": 10.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "wideL_s307",
+  "file": "wideL_s307",
+  "shape": "wideL",
+  "seed": 307,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 232
+  },
+  "kind": "corner",
+  "offset_x": 12.0,
+  "offset_y": -9.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "wideL_s339",
+  "file": "wideL_s339",
+  "shape": "wideL",
+  "seed": 339,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 251
+  },
+  "kind": "corner",
+  "offset_x": -20.0,
+  "offset_y": 3.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "wideR_s305",
+  "file": "wideR_s305",
+  "shape": "wideR",
+  "seed": 305,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 233
+  },
+  "kind": "corner",
+  "offset_x": 20.0,
+  "offset_y": -2.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "wideR_s347",
+  "file": "wideR_s347",
+  "shape": "wideR",
+  "seed": 347,
+  "kinds": {
+   "corner": 3,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 195
+  },
+  "kind": "corner",
+  "offset_x": -6.0,
+  "offset_y": 8.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxL_s301",
+  "file": "boxL_s301",
+  "shape": "boxL",
+  "seed": 301,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 7,
+   "kickoff": 0,
+   "open": 144
+  },
+  "offset_x": -12.0,
+  "offset_y": 10.0,
+  "probe_end": 1600,
+  "kind": "gk_throw"
+ },
+ {
+  "match": "boxL_s305",
+  "file": "boxL_s305",
+  "shape": "boxL",
+  "seed": 305,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 243
+  },
+  "kind": "gk_throw",
+  "offset_x": -24.0,
+  "offset_y": 0.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxL_s310",
+  "file": "boxL_s310",
+  "shape": "boxL",
+  "seed": 310,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 2,
+   "kickoff": 0,
+   "open": 300
+  },
+  "kind": "gk_throw",
+  "offset_x": 24.0,
+  "offset_y": 6.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxL_s318",
+  "file": "boxL_s318",
+  "shape": "boxL",
+  "seed": 318,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 362
+  },
+  "kind": "gk_throw",
+  "offset_x": -16.0,
+  "offset_y": -5.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxL_s329",
+  "file": "boxL_s329",
+  "shape": "boxL",
+  "seed": 329,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 6,
+   "kickoff": 0,
+   "open": 241
+  },
+  "kind": "gk_throw",
+  "offset_x": 16.0,
+  "offset_y": 10.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxL_s333",
+  "file": "boxL_s333",
+  "shape": "boxL",
+  "seed": 333,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 239
+  },
+  "kind": "gk_throw",
+  "offset_x": 0.0,
+  "offset_y": -9.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxL_s337",
+  "file": "boxL_s337",
+  "shape": "boxL",
+  "seed": 337,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 2,
+   "kickoff": 0,
+   "open": 166
+  },
+  "kind": "gk_throw",
+  "offset_x": -12.0,
+  "offset_y": 3.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxR_s307",
+  "file": "boxR_s307",
+  "shape": "boxR",
+  "seed": 307,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 3,
+   "kickoff": 0,
+   "open": 243
+  },
+  "kind": "gk_throw",
+  "offset_x": 12.0,
+  "offset_y": -2.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxR_s313",
+  "file": "boxR_s313",
+  "shape": "boxR",
+  "seed": 313,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 2,
+   "kickoff": 0,
+   "open": 203
+  },
+  "kind": "gk_throw",
+  "offset_x": -20.0,
+  "offset_y": 8.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxR_s314",
+  "file": "boxR_s314",
+  "shape": "boxR",
+  "seed": 314,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 7,
+   "kickoff": 0,
+   "open": 295
+  },
+  "kind": "gk_throw",
+  "offset_x": 20.0,
+  "offset_y": -7.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxR_s323",
+  "file": "boxR_s323",
+  "shape": "boxR",
+  "seed": 323,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 3,
+   "kickoff": 0,
+   "open": 254
+  },
+  "kind": "gk_throw",
+  "offset_x": -6.0,
+  "offset_y": 0.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxR_s325",
+  "file": "boxR_s325",
+  "shape": "boxR",
+  "seed": 325,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 248
+  },
+  "kind": "gk_throw",
+  "offset_x": 6.0,
+  "offset_y": 6.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxR_s331",
+  "file": "boxR_s331",
+  "shape": "boxR",
+  "seed": 331,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 11,
+   "kickoff": 0,
+   "open": 284
+  },
+  "kind": "gk_throw",
+  "offset_x": -24.0,
+  "offset_y": -5.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "boxR_s345",
+  "file": "boxR_s345",
+  "shape": "boxR",
+  "seed": 345,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 5,
+   "kickoff": 0,
+   "open": 298
+  },
+  "kind": "gk_throw",
+  "offset_x": 24.0,
+  "offset_y": 10.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "countL_s335",
+  "file": "countL_s335",
+  "shape": "countL",
+  "seed": 335,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 191
+  },
+  "kind": "gk_throw",
+  "offset_x": -16.0,
+  "offset_y": -9.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "countL_s344",
+  "file": "countL_s344",
+  "shape": "countL",
+  "seed": 344,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 267
+  },
+  "kind": "gk_throw",
+  "offset_x": 16.0,
+  "offset_y": 3.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "countR_s333",
+  "file": "countR_s333",
+  "shape": "countR",
+  "seed": 333,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 215
+  },
+  "kind": "gk_throw",
+  "offset_x": 0.0,
+  "offset_y": -2.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "flankL_s334",
+  "file": "flankL_s334",
+  "shape": "flankL",
+  "seed": 334,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 288
+  },
+  "kind": "gk_throw",
+  "offset_x": -12.0,
+  "offset_y": 8.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "flankL_s337",
+  "file": "flankL_s337",
+  "shape": "flankL",
+  "seed": 337,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 219
+  },
+  "kind": "gk_throw",
+  "offset_x": 12.0,
+  "offset_y": -7.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "flankL_s338",
+  "file": "flankL_s338",
+  "shape": "flankL",
+  "seed": 338,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 6,
+   "kickoff": 0,
+   "open": 241
+  },
+  "kind": "gk_throw",
+  "offset_x": -20.0,
+  "offset_y": 0.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "flankL2_s307",
+  "file": "flankL2_s307",
+  "shape": "flankL2",
+  "seed": 307,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 2,
+   "kickoff": 0,
+   "open": 252
+  },
+  "kind": "gk_throw",
+  "offset_x": 20.0,
+  "offset_y": 6.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "flankL2_s331",
+  "file": "flankL2_s331",
+  "shape": "flankL2",
+  "seed": 331,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 8,
+   "kickoff": 0,
+   "open": 231
+  },
+  "kind": "gk_throw",
+  "offset_x": -6.0,
+  "offset_y": -5.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s300",
+  "file": "mid_bal_s300",
+  "shape": "mid_bal",
+  "seed": 300,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 3,
+   "open": 245
+  },
+  "offset_x": -24.0,
+  "offset_y": 8.0,
+  "probe_end": 1600,
+  "kind": "kickoff"
+ },
+ {
+  "match": "mid_bal_s301",
+  "file": "mid_bal_s301",
+  "shape": "mid_bal",
+  "seed": 301,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 6,
+   "open": 224
+  },
+  "offset_x": 24.0,
+  "offset_y": 6.0,
+  "probe_end": 1600,
+  "kind": "kickoff"
+ },
+ {
+  "match": "mid_bal_s302",
+  "file": "mid_bal_s302",
+  "shape": "mid_bal",
+  "seed": 302,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 5,
+   "open": 226
+  },
+  "offset_x": -16.0,
+  "offset_y": -9.0,
+  "probe_end": 1600,
+  "kind": "kickoff"
+ },
+ {
+  "match": "mid_bal_s303",
+  "file": "mid_bal_s303",
+  "shape": "mid_bal",
+  "seed": 303,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 6,
+   "open": 362
+  },
+  "offset_x": 16.0,
+  "offset_y": 8.0,
+  "probe_end": 1600,
+  "kind": "kickoff"
+ },
+ {
+  "match": "mid_bal_s304",
+  "file": "mid_bal_s304",
+  "shape": "mid_bal",
+  "seed": 304,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 4,
+   "open": 156
+  },
+  "offset_x": 0.0,
+  "offset_y": 6.0,
+  "probe_end": 1600,
+  "kind": "kickoff"
+ },
+ {
+  "match": "mid_bal_s305",
+  "file": "mid_bal_s305",
+  "shape": "mid_bal",
+  "seed": 305,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 1,
+   "kickoff": 2,
+   "open": 227
+  },
+  "kind": "kickoff",
+  "offset_x": 0.0,
+  "offset_y": -7.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s306",
+  "file": "mid_bal_s306",
+  "shape": "mid_bal",
+  "seed": 306,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 2,
+   "open": 239
+  },
+  "kind": "kickoff",
+  "offset_x": -12.0,
+  "offset_y": 0.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s307",
+  "file": "mid_bal_s307",
+  "shape": "mid_bal",
+  "seed": 307,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 6,
+   "open": 184
+  },
+  "kind": "kickoff",
+  "offset_x": 12.0,
+  "offset_y": 6.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s308",
+  "file": "mid_bal_s308",
+  "shape": "mid_bal",
+  "seed": 308,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 3,
+   "open": 305
+  },
+  "kind": "kickoff",
+  "offset_x": -20.0,
+  "offset_y": -5.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s309",
+  "file": "mid_bal_s309",
+  "shape": "mid_bal",
+  "seed": 309,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 2,
+   "open": 318
+  },
+  "kind": "kickoff",
+  "offset_x": 20.0,
+  "offset_y": 10.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s310",
+  "file": "mid_bal_s310",
+  "shape": "mid_bal",
+  "seed": 310,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 5,
+   "open": 306
+  },
+  "kind": "kickoff",
+  "offset_x": -6.0,
+  "offset_y": -9.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s312",
+  "file": "mid_bal_s312",
+  "shape": "mid_bal",
+  "seed": 312,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 5,
+   "open": 260
+  },
+  "kind": "kickoff",
+  "offset_x": 6.0,
+  "offset_y": 3.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s313",
+  "file": "mid_bal_s313",
+  "shape": "mid_bal",
+  "seed": 313,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 2,
+   "open": 250
+  },
+  "kind": "kickoff",
+  "offset_x": -24.0,
+  "offset_y": -2.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s314",
+  "file": "mid_bal_s314",
+  "shape": "mid_bal",
+  "seed": 314,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 3,
+   "open": 271
+  },
+  "kind": "kickoff",
+  "offset_x": 24.0,
+  "offset_y": 8.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s315",
+  "file": "mid_bal_s315",
+  "shape": "mid_bal",
+  "seed": 315,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 3,
+   "open": 261
+  },
+  "kind": "kickoff",
+  "offset_x": -16.0,
+  "offset_y": -7.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s316",
+  "file": "mid_bal_s316",
+  "shape": "mid_bal",
+  "seed": 316,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 3,
+   "open": 178
+  },
+  "kind": "kickoff",
+  "offset_x": 16.0,
+  "offset_y": 0.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s317",
+  "file": "mid_bal_s317",
+  "shape": "mid_bal",
+  "seed": 317,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 3,
+   "open": 261
+  },
+  "kind": "kickoff",
+  "offset_x": 0.0,
+  "offset_y": 6.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s318",
+  "file": "mid_bal_s318",
+  "shape": "mid_bal",
+  "seed": 318,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 2,
+   "open": 318
+  },
+  "kind": "kickoff",
+  "offset_x": -12.0,
+  "offset_y": -5.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s319",
+  "file": "mid_bal_s319",
+  "shape": "mid_bal",
+  "seed": 319,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 2,
+   "open": 228
+  },
+  "kind": "kickoff",
+  "offset_x": 12.0,
+  "offset_y": 10.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s320",
+  "file": "mid_bal_s320",
+  "shape": "mid_bal",
+  "seed": 320,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 2,
+   "open": 232
+  },
+  "kind": "kickoff",
+  "offset_x": -20.0,
+  "offset_y": -9.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s324",
+  "file": "mid_bal_s324",
+  "shape": "mid_bal",
+  "seed": 324,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 6,
+   "open": 365
+  },
+  "kind": "kickoff",
+  "offset_x": 20.0,
+  "offset_y": 3.0,
+  "probe_end": 2750
+ },
+ {
+  "match": "mid_bal_s325",
+  "file": "mid_bal_s325",
+  "shape": "mid_bal",
+  "seed": 325,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 6,
+   "open": 209
+  },
+  "kind": "kickoff",
+  "offset_x": -6.0,
+  "offset_y": -2.0,
+  "probe_end": 2750
+ },
+ {
   "match": "boxL_s300",
   "file": "boxL_s300",
   "shape": "boxL",
@@ -12,6 +988,679 @@
   },
   "offset_x": 0.0,
   "offset_y": 0.0,
+  "probe_end": 1600,
+  "kind": "open"
+ },
+ {
+  "match": "boxL_s302",
+  "file": "boxL_s302",
+  "shape": "boxL",
+  "seed": 302,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 228
+  },
+  "offset_x": 12.0,
+  "offset_y": -2.0,
+  "probe_end": 1600,
+  "kind": "open"
+ },
+ {
+  "match": "boxL_s303",
+  "file": "boxL_s303",
+  "shape": "boxL",
+  "seed": 303,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 281
+  },
+  "offset_x": -20.0,
+  "offset_y": 0.0,
+  "probe_end": 1600,
+  "kind": "open"
+ },
+ {
+  "match": "boxL_s304",
+  "file": "boxL_s304",
+  "shape": "boxL",
+  "seed": 304,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 269
+  },
+  "offset_x": 20.0,
+  "offset_y": 10.0,
+  "probe_end": 1600,
+  "kind": "open"
+ },
+ {
+  "match": "boxL_s306",
+  "file": "boxL_s306",
+  "shape": "boxL",
+  "seed": 306,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 192
+  },
+  "kind": "open",
+  "offset_x": 16.0,
+  "offset_y": -5.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s307",
+  "file": "boxL_s307",
+  "shape": "boxL",
+  "seed": 307,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 254
+  },
+  "kind": "open",
+  "offset_x": 0.0,
+  "offset_y": 10.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s308",
+  "file": "boxL_s308",
+  "shape": "boxL",
+  "seed": 308,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 261
+  },
+  "kind": "open",
+  "offset_x": -12.0,
+  "offset_y": -9.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s309",
+  "file": "boxL_s309",
+  "shape": "boxL",
+  "seed": 309,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 169
+  },
+  "kind": "open",
+  "offset_x": 12.0,
+  "offset_y": 3.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s311",
+  "file": "boxL_s311",
+  "shape": "boxL",
+  "seed": 311,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 259
+  },
+  "kind": "open",
+  "offset_x": -20.0,
+  "offset_y": -2.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s312",
+  "file": "boxL_s312",
+  "shape": "boxL",
+  "seed": 312,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 283
+  },
+  "kind": "open",
+  "offset_x": 20.0,
+  "offset_y": 8.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s313",
+  "file": "boxL_s313",
+  "shape": "boxL",
+  "seed": 313,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 199
+  },
+  "kind": "open",
+  "offset_x": -6.0,
+  "offset_y": -7.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s314",
+  "file": "boxL_s314",
+  "shape": "boxL",
+  "seed": 314,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 198
+  },
+  "kind": "open",
+  "offset_x": 6.0,
+  "offset_y": 0.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s315",
+  "file": "boxL_s315",
+  "shape": "boxL",
+  "seed": 315,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 261
+  },
+  "kind": "open",
+  "offset_x": -24.0,
+  "offset_y": 6.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s316",
+  "file": "boxL_s316",
+  "shape": "boxL",
+  "seed": 316,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 188
+  },
+  "kind": "open",
+  "offset_x": 24.0,
+  "offset_y": -5.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s317",
+  "file": "boxL_s317",
+  "shape": "boxL",
+  "seed": 317,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 149
+  },
+  "kind": "open",
+  "offset_x": -16.0,
+  "offset_y": 10.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s319",
+  "file": "boxL_s319",
+  "shape": "boxL",
+  "seed": 319,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 215
+  },
+  "kind": "open",
+  "offset_x": 16.0,
+  "offset_y": -9.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s320",
+  "file": "boxL_s320",
+  "shape": "boxL",
+  "seed": 320,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 179
+  },
+  "kind": "open",
+  "offset_x": 0.0,
+  "offset_y": 3.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s321",
+  "file": "boxL_s321",
+  "shape": "boxL",
+  "seed": 321,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 257
+  },
+  "kind": "open",
+  "offset_x": -12.0,
+  "offset_y": -2.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s322",
+  "file": "boxL_s322",
+  "shape": "boxL",
+  "seed": 322,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 292
+  },
+  "kind": "open",
+  "offset_x": 12.0,
+  "offset_y": 8.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s323",
+  "file": "boxL_s323",
+  "shape": "boxL",
+  "seed": 323,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 225
+  },
+  "kind": "open",
+  "offset_x": -20.0,
+  "offset_y": -7.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s324",
+  "file": "boxL_s324",
+  "shape": "boxL",
+  "seed": 324,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 321
+  },
+  "kind": "open",
+  "offset_x": 20.0,
+  "offset_y": 0.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s325",
+  "file": "boxL_s325",
+  "shape": "boxL",
+  "seed": 325,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 201
+  },
+  "kind": "open",
+  "offset_x": -6.0,
+  "offset_y": 6.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s326",
+  "file": "boxL_s326",
+  "shape": "boxL",
+  "seed": 326,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 157
+  },
+  "kind": "open",
+  "offset_x": 6.0,
+  "offset_y": -5.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s327",
+  "file": "boxL_s327",
+  "shape": "boxL",
+  "seed": 327,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 195
+  },
+  "kind": "open",
+  "offset_x": -24.0,
+  "offset_y": 10.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s328",
+  "file": "boxL_s328",
+  "shape": "boxL",
+  "seed": 328,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 293
+  },
+  "kind": "open",
+  "offset_x": 24.0,
+  "offset_y": -9.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s330",
+  "file": "boxL_s330",
+  "shape": "boxL",
+  "seed": 330,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 222
+  },
+  "kind": "open",
+  "offset_x": -16.0,
+  "offset_y": 3.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s331",
+  "file": "boxL_s331",
+  "shape": "boxL",
+  "seed": 331,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 254
+  },
+  "kind": "open",
+  "offset_x": 16.0,
+  "offset_y": -2.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s332",
+  "file": "boxL_s332",
+  "shape": "boxL",
+  "seed": 332,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 326
+  },
+  "kind": "open",
+  "offset_x": 0.0,
+  "offset_y": 8.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s334",
+  "file": "boxL_s334",
+  "shape": "boxL",
+  "seed": 334,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 168
+  },
+  "kind": "open",
+  "offset_x": -12.0,
+  "offset_y": -7.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s335",
+  "file": "boxL_s335",
+  "shape": "boxL",
+  "seed": 335,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 231
+  },
+  "kind": "open",
+  "offset_x": 12.0,
+  "offset_y": 0.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s336",
+  "file": "boxL_s336",
+  "shape": "boxL",
+  "seed": 336,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 303
+  },
+  "kind": "open",
+  "offset_x": -20.0,
+  "offset_y": 6.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s338",
+  "file": "boxL_s338",
+  "shape": "boxL",
+  "seed": 338,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 276
+  },
+  "kind": "open",
+  "offset_x": 20.0,
+  "offset_y": -5.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s339",
+  "file": "boxL_s339",
+  "shape": "boxL",
+  "seed": 339,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 232
+  },
+  "kind": "open",
+  "offset_x": -6.0,
+  "offset_y": 10.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s340",
+  "file": "boxL_s340",
+  "shape": "boxL",
+  "seed": 340,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 285
+  },
+  "kind": "open",
+  "offset_x": 6.0,
+  "offset_y": -9.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s341",
+  "file": "boxL_s341",
+  "shape": "boxL",
+  "seed": 341,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 185
+  },
+  "kind": "open",
+  "offset_x": -24.0,
+  "offset_y": 3.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s342",
+  "file": "boxL_s342",
+  "shape": "boxL",
+  "seed": 342,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 133
+  },
+  "kind": "open",
+  "offset_x": 24.0,
+  "offset_y": -2.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s343",
+  "file": "boxL_s343",
+  "shape": "boxL",
+  "seed": 343,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 228
+  },
+  "kind": "open",
+  "offset_x": -16.0,
+  "offset_y": 8.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s344",
+  "file": "boxL_s344",
+  "shape": "boxL",
+  "seed": 344,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 230
+  },
+  "kind": "open",
+  "offset_x": 16.0,
+  "offset_y": -7.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s345",
+  "file": "boxL_s345",
+  "shape": "boxL",
+  "seed": 345,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 222
+  },
+  "kind": "open",
+  "offset_x": 0.0,
+  "offset_y": 0.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s346",
+  "file": "boxL_s346",
+  "shape": "boxL",
+  "seed": 346,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 233
+  },
+  "kind": "open",
+  "offset_x": -12.0,
+  "offset_y": 6.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s347",
+  "file": "boxL_s347",
+  "shape": "boxL",
+  "seed": 347,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 237
+  },
+  "kind": "open",
+  "offset_x": 12.0,
+  "offset_y": -5.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s348",
+  "file": "boxL_s348",
+  "shape": "boxL",
+  "seed": 348,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 219
+  },
+  "kind": "open",
+  "offset_x": -20.0,
+  "offset_y": 10.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxL_s349",
+  "file": "boxL_s349",
+  "shape": "boxL",
+  "seed": 349,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 301
+  },
+  "kind": "open",
+  "offset_x": 20.0,
+  "offset_y": -9.0,
   "probe_end": 1600
  },
  {
@@ -27,6 +1676,263 @@
   },
   "offset_x": -12.0,
   "offset_y": 6.0,
+  "probe_end": 1600,
+  "kind": "open"
+ },
+ {
+  "match": "boxR_s301",
+  "file": "boxR_s301",
+  "shape": "boxR",
+  "seed": 301,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 173
+  },
+  "offset_x": 12.0,
+  "offset_y": -9.0,
+  "probe_end": 1600,
+  "kind": "open"
+ },
+ {
+  "match": "boxR_s302",
+  "file": "boxR_s302",
+  "shape": "boxR",
+  "seed": 302,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 247
+  },
+  "offset_x": -20.0,
+  "offset_y": 8.0,
+  "probe_end": 1600,
+  "kind": "open"
+ },
+ {
+  "match": "boxR_s303",
+  "file": "boxR_s303",
+  "shape": "boxR",
+  "seed": 303,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 301
+  },
+  "offset_x": 20.0,
+  "offset_y": 6.0,
+  "probe_end": 1600,
+  "kind": "open"
+ },
+ {
+  "match": "boxR_s304",
+  "file": "boxR_s304",
+  "shape": "boxR",
+  "seed": 304,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 242
+  },
+  "offset_x": -6.0,
+  "offset_y": -9.0,
+  "probe_end": 1600,
+  "kind": "open"
+ },
+ {
+  "match": "boxR_s305",
+  "file": "boxR_s305",
+  "shape": "boxR",
+  "seed": 305,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 256
+  },
+  "kind": "open",
+  "offset_x": 16.0,
+  "offset_y": 6.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s306",
+  "file": "boxR_s306",
+  "shape": "boxR",
+  "seed": 306,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 234
+  },
+  "kind": "open",
+  "offset_x": 0.0,
+  "offset_y": -5.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s308",
+  "file": "boxR_s308",
+  "shape": "boxR",
+  "seed": 308,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 182
+  },
+  "kind": "open",
+  "offset_x": -12.0,
+  "offset_y": 10.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s309",
+  "file": "boxR_s309",
+  "shape": "boxR",
+  "seed": 309,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 233
+  },
+  "kind": "open",
+  "offset_x": 12.0,
+  "offset_y": -9.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s310",
+  "file": "boxR_s310",
+  "shape": "boxR",
+  "seed": 310,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 247
+  },
+  "kind": "open",
+  "offset_x": -20.0,
+  "offset_y": 3.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s311",
+  "file": "boxR_s311",
+  "shape": "boxR",
+  "seed": 311,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 254
+  },
+  "kind": "open",
+  "offset_x": 20.0,
+  "offset_y": -2.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s312",
+  "file": "boxR_s312",
+  "shape": "boxR",
+  "seed": 312,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 186
+  },
+  "kind": "open",
+  "offset_x": -6.0,
+  "offset_y": 8.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s315",
+  "file": "boxR_s315",
+  "shape": "boxR",
+  "seed": 315,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 114
+  },
+  "kind": "open",
+  "offset_x": 6.0,
+  "offset_y": -7.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s316",
+  "file": "boxR_s316",
+  "shape": "boxR",
+  "seed": 316,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 239
+  },
+  "kind": "open",
+  "offset_x": -24.0,
+  "offset_y": 0.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s317",
+  "file": "boxR_s317",
+  "shape": "boxR",
+  "seed": 317,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 182
+  },
+  "kind": "open",
+  "offset_x": 24.0,
+  "offset_y": 6.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s318",
+  "file": "boxR_s318",
+  "shape": "boxR",
+  "seed": 318,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 254
+  },
+  "kind": "open",
+  "offset_x": -16.0,
+  "offset_y": -5.0,
+  "probe_end": 1600
+ },
+ {
+  "match": "boxR_s319",
+  "file": "boxR_s319",
+  "shape": "boxR",
+  "seed": 319,
+  "kinds": {
+   "corner": 0,
+   "gk_throw": 0,
+   "kickoff": 0,
+   "open": 277
+  },
+  "kind": "open",
+  "offset_x": 16.0,
+  "offset_y": 10.0,
   "probe_end": 1600
  },
  {
@@ -42,7 +1948,8 @@
   },
   "offset_x": 12.0,
   "offset_y": -5.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "countR_s300",
@@ -57,7 +1964,8 @@
   },
   "offset_x": -20.0,
   "offset_y": 10.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankL_s300",
@@ -72,7 +1980,8 @@
   },
   "offset_x": 20.0,
   "offset_y": -9.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankL2_s300",
@@ -87,7 +1996,8 @@
   },
   "offset_x": -6.0,
   "offset_y": 3.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankR_s300",
@@ -102,22 +2012,8 @@
   },
   "offset_x": 6.0,
   "offset_y": -2.0,
-  "probe_end": 1600
- },
- {
-  "match": "mid_bal_s300",
-  "file": "mid_bal_s300",
-  "shape": "mid_bal",
-  "seed": 300,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 3,
-   "open": 245
-  },
-  "offset_x": -24.0,
-  "offset_y": 8.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "mid_push_s300",
@@ -132,7 +2028,8 @@
   },
   "offset_x": 24.0,
   "offset_y": -7.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "mid_r_s300",
@@ -147,7 +2044,8 @@
   },
   "offset_x": -16.0,
   "offset_y": 0.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "wideL_s300",
@@ -162,7 +2060,8 @@
   },
   "offset_x": 16.0,
   "offset_y": 6.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "wideR_s300",
@@ -177,37 +2076,8 @@
   },
   "offset_x": 0.0,
   "offset_y": -5.0,
-  "probe_end": 1600
- },
- {
-  "match": "boxL_s301",
-  "file": "boxL_s301",
-  "shape": "boxL",
-  "seed": 301,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 7,
-   "kickoff": 0,
-   "open": 144
-  },
-  "offset_x": -12.0,
-  "offset_y": 10.0,
-  "probe_end": 1600
- },
- {
-  "match": "boxR_s301",
-  "file": "boxR_s301",
-  "shape": "boxR",
-  "seed": 301,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 0,
-   "open": 173
-  },
-  "offset_x": 12.0,
-  "offset_y": -9.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "countL_s301",
@@ -222,7 +2092,8 @@
   },
   "offset_x": -20.0,
   "offset_y": 3.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "countR_s301",
@@ -237,7 +2108,8 @@
   },
   "offset_x": 20.0,
   "offset_y": -2.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankL_s301",
@@ -252,7 +2124,8 @@
   },
   "offset_x": -6.0,
   "offset_y": 8.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankL2_s301",
@@ -267,7 +2140,8 @@
   },
   "offset_x": 6.0,
   "offset_y": -7.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankR_s301",
@@ -282,22 +2156,8 @@
   },
   "offset_x": -24.0,
   "offset_y": 0.0,
-  "probe_end": 1600
- },
- {
-  "match": "mid_bal_s301",
-  "file": "mid_bal_s301",
-  "shape": "mid_bal",
-  "seed": 301,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 6,
-   "open": 224
-  },
-  "offset_x": 24.0,
-  "offset_y": 6.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "mid_push_s301",
@@ -312,7 +2172,8 @@
   },
   "offset_x": -16.0,
   "offset_y": -5.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "mid_r_s301",
@@ -327,7 +2188,8 @@
   },
   "offset_x": 16.0,
   "offset_y": 10.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "wideL_s301",
@@ -342,7 +2204,8 @@
   },
   "offset_x": 0.0,
   "offset_y": -9.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "wideR_s301",
@@ -357,37 +2220,8 @@
   },
   "offset_x": -12.0,
   "offset_y": 3.0,
-  "probe_end": 1600
- },
- {
-  "match": "boxL_s302",
-  "file": "boxL_s302",
-  "shape": "boxL",
-  "seed": 302,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 0,
-   "open": 228
-  },
-  "offset_x": 12.0,
-  "offset_y": -2.0,
-  "probe_end": 1600
- },
- {
-  "match": "boxR_s302",
-  "file": "boxR_s302",
-  "shape": "boxR",
-  "seed": 302,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 0,
-   "open": 247
-  },
-  "offset_x": -20.0,
-  "offset_y": 8.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "countL_s302",
@@ -402,7 +2236,8 @@
   },
   "offset_x": 20.0,
   "offset_y": -7.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "countR_s302",
@@ -417,7 +2252,8 @@
   },
   "offset_x": -6.0,
   "offset_y": 0.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankL_s302",
@@ -432,7 +2268,8 @@
   },
   "offset_x": 6.0,
   "offset_y": 6.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankL2_s302",
@@ -447,7 +2284,8 @@
   },
   "offset_x": -24.0,
   "offset_y": -5.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankR_s302",
@@ -462,22 +2300,8 @@
   },
   "offset_x": 24.0,
   "offset_y": 10.0,
-  "probe_end": 1600
- },
- {
-  "match": "mid_bal_s302",
-  "file": "mid_bal_s302",
-  "shape": "mid_bal",
-  "seed": 302,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 5,
-   "open": 226
-  },
-  "offset_x": -16.0,
-  "offset_y": -9.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "mid_push_s302",
@@ -492,7 +2316,8 @@
   },
   "offset_x": 16.0,
   "offset_y": 3.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "mid_r_s302",
@@ -507,7 +2332,8 @@
   },
   "offset_x": 0.0,
   "offset_y": -2.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "wideL_s302",
@@ -522,7 +2348,8 @@
   },
   "offset_x": -12.0,
   "offset_y": 8.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "wideR_s302",
@@ -537,37 +2364,8 @@
   },
   "offset_x": 12.0,
   "offset_y": -7.0,
-  "probe_end": 1600
- },
- {
-  "match": "boxL_s303",
-  "file": "boxL_s303",
-  "shape": "boxL",
-  "seed": 303,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 0,
-   "open": 281
-  },
-  "offset_x": -20.0,
-  "offset_y": 0.0,
-  "probe_end": 1600
- },
- {
-  "match": "boxR_s303",
-  "file": "boxR_s303",
-  "shape": "boxR",
-  "seed": 303,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 0,
-   "open": 301
-  },
-  "offset_x": 20.0,
-  "offset_y": 6.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "countL_s303",
@@ -582,7 +2380,8 @@
   },
   "offset_x": -6.0,
   "offset_y": -5.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "countR_s303",
@@ -597,7 +2396,8 @@
   },
   "offset_x": 6.0,
   "offset_y": 10.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankL_s303",
@@ -612,7 +2412,8 @@
   },
   "offset_x": -24.0,
   "offset_y": -9.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankL2_s303",
@@ -627,7 +2428,8 @@
   },
   "offset_x": 24.0,
   "offset_y": 3.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankR_s303",
@@ -642,22 +2444,8 @@
   },
   "offset_x": -16.0,
   "offset_y": -2.0,
-  "probe_end": 1600
- },
- {
-  "match": "mid_bal_s303",
-  "file": "mid_bal_s303",
-  "shape": "mid_bal",
-  "seed": 303,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 6,
-   "open": 362
-  },
-  "offset_x": 16.0,
-  "offset_y": 8.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "mid_push_s303",
@@ -672,7 +2460,8 @@
   },
   "offset_x": 0.0,
   "offset_y": -7.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "mid_r_s303",
@@ -687,7 +2476,8 @@
   },
   "offset_x": -12.0,
   "offset_y": 0.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "wideL_s303",
@@ -702,7 +2492,8 @@
   },
   "offset_x": 12.0,
   "offset_y": 6.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "wideR_s303",
@@ -717,37 +2508,8 @@
   },
   "offset_x": -20.0,
   "offset_y": -5.0,
-  "probe_end": 1600
- },
- {
-  "match": "boxL_s304",
-  "file": "boxL_s304",
-  "shape": "boxL",
-  "seed": 304,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 0,
-   "open": 269
-  },
-  "offset_x": 20.0,
-  "offset_y": 10.0,
-  "probe_end": 1600
- },
- {
-  "match": "boxR_s304",
-  "file": "boxR_s304",
-  "shape": "boxR",
-  "seed": 304,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 0,
-   "open": 242
-  },
-  "offset_x": -6.0,
-  "offset_y": -9.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "countL_s304",
@@ -762,7 +2524,8 @@
   },
   "offset_x": 6.0,
   "offset_y": 3.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "countR_s304",
@@ -777,7 +2540,8 @@
   },
   "offset_x": -24.0,
   "offset_y": -2.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankL_s304",
@@ -792,7 +2556,8 @@
   },
   "offset_x": 24.0,
   "offset_y": 8.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankL2_s304",
@@ -807,7 +2572,8 @@
   },
   "offset_x": -16.0,
   "offset_y": -7.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "flankR_s304",
@@ -822,22 +2588,8 @@
   },
   "offset_x": 16.0,
   "offset_y": 0.0,
-  "probe_end": 1600
- },
- {
-  "match": "mid_bal_s304",
-  "file": "mid_bal_s304",
-  "shape": "mid_bal",
-  "seed": 304,
-  "kinds": {
-   "corner": 0,
-   "gk_throw": 0,
-   "kickoff": 4,
-   "open": 156
-  },
-  "offset_x": 0.0,
-  "offset_y": 6.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "mid_push_s304",
@@ -852,7 +2604,8 @@
   },
   "offset_x": -12.0,
   "offset_y": -5.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "mid_r_s304",
@@ -867,7 +2620,8 @@
   },
   "offset_x": 12.0,
   "offset_y": 10.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "wideL_s304",
@@ -882,7 +2636,8 @@
   },
   "offset_x": -20.0,
   "offset_y": -9.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  },
  {
   "match": "wideR_s304",
@@ -897,6 +2652,7 @@
   },
   "offset_x": 20.0,
   "offset_y": 3.0,
-  "probe_end": 1600
+  "probe_end": 1600,
+  "kind": "open"
  }
 ]

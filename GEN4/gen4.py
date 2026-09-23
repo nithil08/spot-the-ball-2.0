@@ -298,58 +298,72 @@ def cmd_shortlist(argv):
 OFFX_SCHEDULE = [0.0, -12.0, 12.0, -20.0, 20.0, -6.0, 6.0, -24.0, 24.0, -16.0, 16.0]
 OFFY_SCHEDULE = [0.0, 6.0, -5.0, 10.0, -9.0, 3.0, -2.0, 8.0, -7.0]
 
-# The probe replays to PROBE_END and its cost is linear in that number. A 1600-frame
-# replay still offers ~300 window positions per match, which is far more level freedom
-# than 24 clips can use; paying for all 2750 would buy candidates we will never reach.
+# The probe replays to PROBE_END and its cost is linear in that number. 1600 frames still
+# offers ~300 window positions per match. The SCARCE classes are exempt: corners run about
+# one usable match in eighty and are spread evenly over the 2750-frame sweep, so capping
+# them throws away a third of the few that exist.
 PROBE_END = 1600
-PROBE_MATCHES = 60         # extend with `plan --more N` if selection comes up short
+PROBE_END_SCARCE = 2750
+SCARCE = ("corner", "gk_throw", "kickoff")
+
+# How many matches to probe per class. The probe is 23 replays per match and is the whole
+# cost of the batch, so the budget goes where the scarcity is — and where the SLOTS are.
+# GEN4 is filling gaps in an existing batch, not building 24 clips from nothing, so these
+# are sized for the handful of (level, class) slots `needs.json` actually asks for.
+# open is 0 on purpose: the 21 matches probed under the first, shape-balanced plan are all
+# open-play capable and cover the one or two open slots this batch still needs. They stay
+# in the plan because they are already measured; adding more would be paying for windows
+# nothing is asking for.
+PROBE_BUDGET = {"corner": 999, "gk_throw": 22, "kickoff": 22, "open": 0}
 
 
 def cmd_plan(argv):
     """Pick the matches to probe and give each one a camera offset.
 
-    Probing is 23 replays per match and everything downstream is cheap, so this number IS
-    the batch's compute budget. It is deliberately a first bite rather than the whole
-    shortlist: `select` reports which levels are short, and only then is it worth paying
-    for more matches.
+    Budgeted BY CLASS, not round-robin by shape. A pool assembled for variety of shapes is
+    the right pool when the situation mix is free; the moment a quota comes back it is the
+    wrong one, because open play is everywhere and corners are not — a shape-balanced 60
+    contained zero corner matches while the batch needed five.
     """
     rows = json.loads(CAND.read_text())
-    want = PROBE_MATCHES
-    if "--more" in argv:
-        want = PROBE_MATCHES + int(argv[argv.index("--more") + 1])
     old = {p["match"]: p for p in json.loads(PLAN.read_text())} if PLAN.exists() else {}
-    # Spread across SHAPES before depth: 14 shapes round-robin, so no single ball start
-    # position or push value dominates the pool and every level has varied framing to
-    # draw on. Within a shape, low seeds first purely for determinism.
-    by_shape = {}
-    for r in sorted(rows, key=lambda r: (r["shape"], r["seed"])):
-        by_shape.setdefault(r["shape"], []).append(r)
-    order, i = [], 0
-    while len(order) < len(rows):
-        added = False
-        for shape in sorted(by_shape):
-            if i < len(by_shape[shape]):
-                order.append(by_shape[shape][i])
-                added = True
-        if not added:
-            break
-        i += 1
-    plan = []
-    for k, r in enumerate(order[:want]):
-        if r["match"] in old:
-            plan.append(old[r["match"]])
-            continue
-        plan.append({"match": r["match"], "file": r["file"], "shape": r["shape"],
-                     "seed": r["seed"], "kinds": r["kinds"],
-                     "offset_x": OFFX_SCHEDULE[k % len(OFFX_SCHEDULE)],
-                     "offset_y": OFFY_SCHEDULE[k % len(OFFY_SCHEDULE)],
-                     "probe_end": PROBE_END})
+    budget = dict(PROBE_BUDGET)
+    if "--more" in argv:
+        kind = argv[argv.index("--more") + 1]
+        budget[kind] = budget.get(kind, 0) + int(argv[argv.index("--more") + 2])
+    plan, taken = [], set()
+    # Scarcest class first: a match able to supply a corner AND open play must be spent on
+    # the corner, because open play has six hundred alternatives and the corner has
+    # seventeen.
+    for kind in CLASS_ORDER:
+        n = 0
+        for r in sorted(rows, key=lambda r: (r["shape"], r["seed"])):
+            if n >= budget.get(kind, 0):
+                break
+            if r["match"] in taken or not r["kinds"][kind]:
+                continue
+            taken.add(r["match"])
+            n += 1
+            if r["match"] in old:
+                plan.append({**old[r["match"]], "kind": kind})
+                continue
+            k = len(plan)
+            plan.append({"match": r["match"], "file": r["file"], "shape": r["shape"],
+                         "seed": r["seed"], "kinds": r["kinds"], "kind": kind,
+                         "offset_x": OFFX_SCHEDULE[k % len(OFFX_SCHEDULE)],
+                         "offset_y": OFFY_SCHEDULE[k % len(OFFY_SCHEDULE)],
+                         "probe_end": (PROBE_END_SCARCE if kind in SCARCE
+                                       else PROBE_END)})
+    # Matches already probed under the old plan stay in it: their counts are on disk and
+    # dropping them would throw away work for nothing.
+    for m, p_ in old.items():
+        if m not in taken:
+            plan.append({**p_, "kind": p_.get("kind", "open")})
     PLAN.write_text(json.dumps(plan, indent=1))
-    shapes = {}
-    for p in plan:
-        shapes[p["shape"]] = shapes.get(p["shape"], 0) + 1
-    print(f"plan: {len(plan)} matches to probe, {len(shapes)} shapes")
-    print("  per shape:", dict(sorted(shapes.items())))
+    got = {k: sum(1 for p in plan if p["kind"] == k) for k in CLASS_ORDER}
+    done = sum(1 for p in plan if (COUNTS / f"{p['match']}.npz").exists())
+    print(f"plan: {len(plan)} matches, {done} already probed")
+    print("  per class:", got)
     return 0
 
 
