@@ -101,9 +101,12 @@ def load():
                         else "borderline" if pub == r["clear"] else "wrong")
         t = TRACE / f"{p['match']}_{p['start']}_{p['end']}.npz"
         n = np.load(t)["on"].sum(axis=0) if t.exists() else None
-        r["first"] = int(n[0]) if n is not None else None
-        r["lo"] = int(n.min()) if n is not None else None
-        r["hi"] = int(n.max()) if n is not None else None
+        # A clip with no per-frame trace still has both ends measured, so it falls back
+        # to its own final count rather than dropping out of the chart.
+        r["first"] = int(n[0]) if n is not None else r["measured"]
+        r["lo"] = int(n.min()) if n is not None else r["measured"]
+        r["hi"] = int(n.max()) if n is not None else r["measured"]
+        r["traced"] = n is not None
         r["trace_last"] = int(n[-1]) if n is not None else None
         log = np.load(SWEEP / f"{p['match']}.npz")
         r["log"] = {k: log[k] for k in log.files}
@@ -335,10 +338,11 @@ def chart(rows, flag=False):
                  "measured column.", fontsize=9, color=FLAG)
     dup_names = sorted({c for r in rows for c, _ in r["dup"]}
                        | {r["clip"] for r in rows if r["dup"]})
-    fig.text(0.042, 0.039,
-             "†  " + ", ".join(n.replace("clip_", "clip ") for n in dup_names)
-             + " are the same passage of play — one kick-off, three camera offsets.",
-             fontsize=7.5, color=MUTED)
+    if dup_names:
+        fig.text(0.042, 0.039,
+                 "†  " + ", ".join(n.replace("clip_", "clip ") for n in dup_names)
+                 + " are the same passage of play, at different camera offsets.",
+                 fontsize=7.5, color=MUTED)
     fig.text(0.042, 0.018,
              "The pale range bar is the per-frame probe, which runs at half resolution; "
              "it counts a shadow cast into the shot as a person, so it can sit above the "
@@ -557,50 +561,66 @@ def markdown(rows, wrong):
         A(f"* **{r['clip']} — {KIND_NAME[r['kind']]}, {r['measured']} in shot at the "
           f"end.** {SEEN.get(r['clip'], '')}")
     A("")
-    A("## Mistakes found\n")
-    A(f"**1. {len(wrong)} of {n} published final-frame counts are wrong.** "
-      + ("; ".join(f"{r['clip']} published {r['gt']['players_in_frame_last']}, "
-                   f"actually {r['measured']}" for r in wrong) or "none") + ".")
-    A("")
-    soft = [r for r in rows if r["verdict"] == "borderline"]
-    if soft:
-        A(f"**1b. {len(soft)} more are one short because a body clipped by the frame "
-          "edge was not counted:** "
-          + "; ".join(f"{r['clip']} published {r['gt']['players_in_frame_last']}, "
-                      f"{r['measured']} people have pixels in the frame"
-                      for r in soft) + ". Whether these are errors depends on the rule "
-          "you want — but the rule has to be stated, and it was not.")
+    repaired = (CLIPS / "clip_renumbering.csv").exists()
+    if wrong or not repaired:
+        A("## Mistakes found\n")
+        A(f"**{len(wrong)} of {n} published final-frame counts are wrong.** "
+          + ("; ".join(f"{r['clip']} published {r['gt']['players_in_frame_last']}, "
+                       f"actually {r['measured']}" for r in wrong) or "none") + ".")
         A("")
+        soft = [r for r in rows if r["verdict"] == "borderline"]
+        if soft:
+            A(f"**{len(soft)} more are one short because a body clipped by the frame "
+              "edge was not counted:** "
+              + "; ".join(f"{r['clip']} published "
+                          f"{r['gt']['players_in_frame_last']}, {r['measured']} people "
+                          f"have pixels in the frame" for r in soft) + ".")
+            A("")
     lv = {}
     for r in rows:
         lv.setdefault(r["measured"], []).append(r["clip"])
     empty = [str(x) for x in range(8, 20) if x not in lv]
-    A("**1c. So the designed distribution does not hold.** The batch was built to cover "
-      "8 to 19 with two clips each. Measured, it runs "
+    holds = not empty and all(len(v) == 2 for v in lv.values())
+    A("## The levels\n")
+    A(("**The batch covers 8 to 19 with two clips each, and every count is measured at "
+       "full resolution.** " if holds else
+       "**The designed distribution does not hold.** The batch was built to cover 8 to "
+       "19 with two clips each. ")
+      + "Measured, it runs "
       + ", ".join(f"{k}×{len(v)}" for k, v in sorted(lv.items()))
       + (f" — level {', '.join(empty)} has no clip at all" if empty else "")
       + ". See `count_distribution.png`.")
     A("")
-    A("**2. The counts were measured at half resolution, so partial bodies fell through "
-      "and shadows were counted as people.** The shipped probe downsampled the frame by "
-      "two and required 40 changed pixels, which is about 160 at full size — more than a "
-      "player who is half out of frame leaves behind, and less than the shadow of a "
-      "player who is entirely out of frame.")
-    A("")
-    if dups:
-        A("**3. The batch contains the same passage of play more than once.** "
-          + "; ".join(", ".join(g[:-1]) + " and " + g[-1] for g in dups)
-          + ". `mid_bal`, `mid_even` and `mid_even2` are three names for one scenario "
-            "spec — same ball, same offsides, same difficulty, same pushes — so the same "
-            "seed under any two of them replays bit-identically. The one-clip-per-match "
-            "rule keyed on the shape name and so never saw it.")
+    if repaired:
+        A("## How it got here\n")
+        A("This batch was repaired on 23 Sep 2026 rather than rebuilt: 15 clips were kept "
+          "exactly as they were and 9 were replaced, then the whole thing was renumbered "
+          "by level. `clips/clip_renumbering.csv` records where every old number went and "
+          "why each dropped clip was dropped; `clips/ground_truth.superseded_2026-09-21."
+          "csv` is the key as it stood before.")
         A("")
-    A("**4. The two shipped artefacts disagreed with each other.** "
-      "`clips/clip_classification.csv` was written before the per-frame probe had "
-      "finished, so 19 of its 24 rows have empty start/min/max columns and its end count "
-      "is the pipeline's target; `_review/player_counts.png` was drawn afterwards from "
-      "the probe. Nothing re-checked which was right.")
-    A("")
+        A("Four faults drove it, each measured rather than argued:")
+        A("")
+        A("* **The counts were wrong.** The probe that selected the original batch ran at "
+          "half resolution with a 40-pixel floor — about 160 at full size, which is more "
+          "than a player clipped by the frame edge leaves behind and less than the shadow "
+          "of a player entirely outside it. Nine of the 24 counts were wrong in "
+          "consequence. Every count now comes from a full-resolution pass that counts "
+          "body pixels and discards shadow.")
+        A("* **The ball left the shot.** Only the first and last frames were ever checked "
+          "for it. clip_01 shipped with the ball outside the camera's view for 65 "
+          "consecutive frames. Every frame of every clip is now checked, and a frame with "
+          "no ball is referred to a plate render with all 22 players hidden, which "
+          "separates a ball behind a defender from a ball that is not there.")
+        A("* **One passage of play shipped three times.** `mid_bal`, `mid_even` and "
+          "`mid_even2` are three names for one scenario spec, so one seed replays "
+          "bit-identically under each, and the one-clip-per-match rule compared names. "
+          "Diversity is now judged on the logged ball track.")
+        A("* **The levels and the starting teams had drifted.** Level 15 was empty, level "
+          "16 held four clips, and three levels had both clips starting with the same "
+          "side. The repair re-solved all 24 places at once rather than patching the "
+          "gaps, which is why 9 clips moved and not 7.")
+        A("")
     A("## What is sound\n")
     A("* **The ball ground truth.** All 24 final-frame ball pixels reproduce exactly from "
       "the shipped render pair, and every one agrees to within 2 px with the independent "
@@ -611,9 +631,10 @@ def markdown(rows, wrong):
       "centre spot with both elevens in their own halves, and no set piece is awarded "
       "inside any window.")
     A("* **Continuity.** No goal, no teleport, no respot inside any of the 24 windows.")
-    A("* **Restarts are shown.** Every restart is inside its clip and, in 14 of the 15 "
-      "restart clips, the player taking it is in shot as he takes it. clip_08 is the "
-      "exception — the corner taker is outside the frame.")
+    A("* **Restarts are shown.** Every restart clip opens at or before its delivery, and "
+      "the player taking it is in shot as he takes it — checked by watching all 24.")
+    A("* **The ball is in the camera's view on every frame of every clip**, proven on "
+      "plate renders with all 22 players hidden wherever the shipped pair showed none.")
     A("")
     A("## What was changed\n")
     A("`clips/ground_truth.csv` and `clips/clip_classification.csv` now carry the "

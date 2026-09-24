@@ -21,6 +21,72 @@ midfield open matches — `mid_r` and `mid_push`, the only shapes that ever reac
 were added to the plan and probed, which restored it to 4 matches at 19 and a feasible
 assignment. Cost about 40 minutes of probe across 3 shards.
 
+## REPAIRED 2026-09-23 — the batch now meets its spec, and the spec is checked against it
+
+**15 clips kept, 9 rebuilt, all 24 renumbered by level.** `clips/clip_renumbering.csv` is
+the mapping: which old number each clip carries now, and why each dropped clip went. The
+key as it stood before is `clips/ground_truth.superseded_2026-09-21.csv`.
+
+`verify_gen3.py` passes every check, including the three it was failing:
+
+```
+counts are 8..19, two each       {8:2, 9:2, ... 19:2}
+situation quota                  corner 5, gk_throw 5, kickoff 5, open 9
+every two-clip level has one blue start and one red start
+starting team is 12 blue / 12 red
+one clip per passage of play     24 distinct passages
+ball found in every final frame  ball spread 23 cells, 6 rows, 14 columns
+```
+
+### Why nine and not seven
+
+A greedy repair — fill the short levels, leave the rest — cannot see that levels 11, 14
+and 16 each held two clips starting with the SAME side, and fixing that by hand breaks the
+class quota, and fixing THAT by hand breaks something else. The constraints are joint, so
+`fill_gaps.py` puts every existing clip and every probed candidate into ONE min-cost flow,
+with existing clips priced far below candidates so the solver keeps one wherever it fits.
+Nine is the minimum rebuild by construction, not by argument.
+
+### The three gates that the original build did not have
+
+1. **Every count is measured at full resolution, body pixels only.** Candidates enter the
+   pool on the old probe's number and cannot leave on it: 57 windows were re-measured, and
+   **a third landed on a different level**. Same error rate that wrecked the first build.
+2. **The ball must be in the camera's view on every frame.** Frames with no ball in the
+   shipped pair are referred to a PLATE render with all 22 players hidden, which separates
+   a ball behind a defender (fine) from a ball that is not in the shot (fatal). Three of
+   the first nine candidates were rejected by this. Screening 42 windows up front — two
+   replays each against a count measurement's 23 — stopped it recurring.
+3. **Diversity is judged on the logged ball track, not the match name.** See the alias
+   note below.
+
+### Things that bit, recorded so they do not bite again
+
+* `_cache/ball_absent.json` was written by the original build's audit and then **never
+  read again** when candidates were re-derived. Three of the first solve's picks sat
+  squarely inside it, one of them the exact window that had already been rejected by hand.
+  It and the plate-proven `ball_offscreen.json` are now consulted, and they bind
+  differently: unreadable-at-an-end matters at the two frames ground truth is read from;
+  proven-out-of-view is fatal anywhere in the window.
+* Installing a repaired `picks.json` silently corrupts a re-solve: the new clip numbers
+  refer to different windows than the measurement cache and the ground truth, which are
+  keyed by the OLD names. `existing()` reads a pinned `picks_before_repair.json` snapshot,
+  which also makes the solve idempotent.
+* Clip numbers are **not recycled**. Nine numbers were freed and nine clips joined;
+  handing the freed numbers to the new clips would make `clip_05` mean one thing in
+  yesterday's scene graph and another today, with nothing to notice it by.
+
+### Drive it
+
+```
+bash finish_repair.sh 5     # screen -> solve -> measure -> emit -> render -> audit -> compose
+bash after_repair.sh 5      # evidence, derived files, charts, verifier
+```
+
+Both loop the phases themselves; the interlocks (a solve wanting counts it lacks, a
+measurement moving a window, an audit rejecting one) are handled rather than driven by
+hand, which was most of the wall clock.
+
 ## RE-MEASURED 2026-09-22 — the player counts were wrong, and the levels do not hold
 
 The headline claim ("end-frame player count exactly 8..19, two clips each") did not

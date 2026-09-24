@@ -1,0 +1,34 @@
+old_clip,new_clip,level,situation,note
+clip_02,clip_01,8,gk_throw,"kept, renumbered"
+,clip_02,8,open,newly built
+clip_03,clip_03,9,gk_throw,"kept, renumbered"
+,clip_04,9,gk_throw,newly built
+clip_06,clip_05,10,kickoff,"kept, renumbered"
+,clip_06,10,open,newly built
+clip_07,clip_07,11,corner,"kept, renumbered"
+,clip_08,11,kickoff,newly built
+,clip_09,12,corner,newly built
+clip_13,clip_10,12,open,"kept, renumbered"
+clip_09,clip_11,13,gk_throw,"kept, renumbered"
+clip_10,clip_12,13,open,"kept, renumbered"
+,clip_13,14,gk_throw,newly built
+clip_12,clip_14,14,open,"kept, renumbered"
+,clip_15,15,corner,newly built
+,clip_16,15,corner,newly built
+clip_17,clip_17,16,corner,"kept, renumbered"
+clip_18,clip_18,16,open,"kept, renumbered"
+,clip_19,17,kickoff,newly built
+clip_20,clip_20,17,open,"kept, renumbered"
+clip_21,clip_21,18,kickoff,"kept, renumbered"
+clip_22,clip_22,18,open,"kept, renumbered"
+clip_23,clip_23,19,kickoff,"kept, renumbered"
+clip_24,clip_24,19,open,"kept, renumbered"
+clip_01,,,,dropped: ball outside the camera view for 65 frames
+clip_04,,,,dropped: measured 7 people — outside the 8..19 range
+clip_05,,,,"dropped: level 11 already held two, and its side started red"
+clip_08,,,,dropped: ball outside the camera view at the corner delivery
+clip_11,,,,dropped: not selected
+clip_14,,,,"dropped: level 14 already held two, and its side started red"
+clip_15,,,,dropped: same passage of play as clip_06 and clip_19
+clip_16,,,,"dropped: level 16 already held two, and its side started red"
+clip_19,,,,dropped: not selected

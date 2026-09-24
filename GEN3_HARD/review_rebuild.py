@@ -1,7 +1,7 @@
-"""review_rebuild.py — the batch as it will be: 17 clips kept, 7 slots still to build.
+"""review_rebuild.py — the repaired batch, showing which clips were kept and which are new.
 
 Writes `_review/player_counts_rebuild.png`. It does NOT touch `player_counts.png`, which
-is the record of the batch as it stands today.
+carries the same 24 clips without the provenance.
 
 WHAT THE CHART HAS TO SAY, WHICH THE OTHER ONE CANNOT
   The counts chart is one row per clip. This one is one row per SLOT — twelve levels,
@@ -51,52 +51,41 @@ LEVELS = list(range(8, 20))
 KIND_NAME = {"corner": "corner kick", "gk_throw": "goalkeeper distribution",
              "kickoff": "kick-off", "open": "open play"}
 
-# Why each replaced clip is going. Written here rather than derived because the reason is
-# a finding, not a measurement — each one is stated in _review/CLIP_REVIEW.md.
-DROPPED = {
-    "clip_01": (8, "ball left the shot for 2.6 s"),
-    "clip_08": (12, "ball left the shot at the corner"),
-    "clip_19": (17, "duplicate of clip 06"),
-    "clip_04": (None, "measured 7 — outside 8-19"),
-    "clip_15": (None, "same kick-off as clip 06"),
-    "clip_11": (None, "surplus at level 13"),
-    "clip_18": (None, "surplus at level 16"),
-}
-NEVER_FILLED = "level was never filled"
+# The renumbering carries the provenance: which old clip each new number came from, or
+# nothing if the clip was built for the repair.
+RENUMBER = CLIPS / "clip_renumbering.csv"
 
 
 def load():
     gt = {r["clip"]: r for r in csv.DictReader(open(CLIPS / "ground_truth.csv"))}
     picks = {p["clip"]: p for p in json.loads(PICKS.read_text())}
-    kept = []
+    came_from = {r["new_clip"]: r["old_clip"]
+                 for r in csv.DictReader(open(RENUMBER)) if r["new_clip"]}
+    out = []
     for c, r in sorted(gt.items()):
-        if c in DROPPED:
-            continue
-        t = TRACE / f"{picks[c]['match']}_{picks[c]['start']}_{picks[c]['end']}.npz"
+        p = picks[c]
+        t = TRACE / f"{p['match']}_{p['start']}_{p['end']}.npz"
         n = np.load(t)["on"].sum(axis=0) if t.exists() else None
-        kept.append({"clip": c, "level": int(r["players_in_frame_last"]),
-                     "kind": picks[c]["kind"],
-                     "first": int(n[0]) if n is not None else None,
-                     "lo": int(n.min()) if n is not None else None,
-                     "hi": int(n.max()) if n is not None else None})
-    return kept
+        lvl = int(r["players_in_frame_last"])
+        out.append({"clip": c, "level": lvl, "kind": p["kind"],
+                    "was": came_from.get(c) or "",
+                    "first": int(n[0]) if n is not None else None,
+                    "lo": int(n.min()) if n is not None else lvl,
+                    "hi": int(n.max()) if n is not None else lvl})
+    return out
 
 
 def rows(kept):
-    """One entry per SLOT, two per level, filled ones first."""
+    """One entry per SLOT, two per level — the shape of the spec, not of the clip list."""
     by = defaultdict(list)
     for k in kept:
         by[k["level"]].append(k)
     out = []
     for lv in LEVELS:
-        have = sorted(by.get(lv, []), key=lambda k: k["clip"])
-        for k in have[:2]:
+        for k in sorted(by.get(lv, []), key=lambda k: k["clip"])[:2]:
             out.append({"level": lv, "clip": k})
-        for _ in range(2 - len(have[:2])):
-            repl = next((c for c, (l, _w) in DROPPED.items() if l == lv), None)
-            out.append({"level": lv, "clip": None,
-                        "why": (f"replaces {repl.replace('clip_', 'clip ')}: "
-                                f"{DROPPED[repl][1]}") if repl else NEVER_FILLED})
+        for _ in range(2 - len(by.get(lv, [])[:2])):
+            out.append({"level": lv, "clip": None, "why": "unfilled"})
     return out
 
 
@@ -111,7 +100,7 @@ def chart(kept):
                          "axes.facecolor": SURFACE})
     data = rows(kept)
     fig = plt.figure(figsize=(11.2, 10.2), dpi=150)
-    ax = fig.add_axes([0.075, 0.075, 0.535, 0.735])
+    ax = fig.add_axes([0.065, 0.075, 0.475, 0.735])
     y = np.arange(len(data))[::-1]
     # x in axes fraction, y in data units: the label gutter to the right of the plot.
     tr = ax.get_yaxis_transform()
@@ -136,21 +125,28 @@ def chart(kept):
             continue
         ax.plot([k["lo"], k["hi"]], [i, i], color=SEQ0, lw=7, solid_capstyle="round",
                 zorder=1)
-        ax.plot([k["first"], k["level"]], [i, i], color=AXIS, lw=2,
-                solid_capstyle="round", zorder=2)
+        if k["first"] is not None:
+            ax.plot([k["first"], k["level"]], [i, i], color=AXIS, lw=2,
+                    solid_capstyle="round", zorder=2)
         same = k["first"] == k["level"]
-        ax.plot(k["first"], i, "o", ms=13 if same else 9, mfc=S1, mec=SURFACE, mew=1.6,
-                zorder=3)
+        if k["first"] is not None:
+            ax.plot(k["first"], i, "o", ms=13 if same else 9, mfc=S1, mec=SURFACE,
+                    mew=1.6, zorder=3)
         ax.plot(k["level"], i, "o", ms=9, mfc=S2, mec=SURFACE if not same else S2,
                 mew=1.6 if not same else 0, zorder=4)
-        lo, hi = sorted((k["first"], k["level"]))
-        if lo != hi:
-            ax.text(lo - 0.42, i, str(lo), va="center", ha="right", fontsize=8,
-                    color=INK2)
+        if k["first"] is not None:
+            lo, hi = sorted((k["first"], k["level"]))
+            if lo != hi:
+                ax.text(lo - 0.42, i, str(lo), va="center", ha="right", fontsize=8,
+                        color=INK2)
         ax.text(1.02, i, k["clip"].replace("clip_", "clip "), va="center", ha="left",
                 fontsize=8.5, color=INK2, transform=tr)
-        ax.text(1.115, i, KIND_NAME[k["kind"]], va="center", ha="left", fontsize=8,
+        ax.text(1.10, i, KIND_NAME[k["kind"]], va="center", ha="left", fontsize=8,
                 color=MUTED, transform=tr)
+        ax.text(1.60, i, f"was {k['was'].replace('clip_', 'clip ')}" if k["was"]
+                else "newly built", va="center", ha="left", fontsize=8,
+                color=MUTED if k["was"] else S2, transform=tr,
+                weight="normal" if k["was"] else "bold")
 
     ax.set_yticks(y, [f"level {d['level']}" if j % 2 == 0 else ""
                       for j, d in enumerate(data)], fontsize=9.5)
@@ -178,33 +174,41 @@ def chart(kept):
                    label="final frame — the level"),
         plt.Line2D([], [], color=SEQ0, lw=7, solid_capstyle="round",
                    label="range during the clip"),
-        plt.Line2D([], [], marker="s", ls="", ms=9, mfc="none", mec=MUTED, mew=1.3,
-                   label="slot still to build"),
     ]
+    if any(d["clip"] is None for d in data):
+        handles.append(plt.Line2D([], [], marker="s", ls="", ms=9, mfc="none",
+                                  mec=MUTED, mew=1.3, label="slot still to build"))
     ax.legend(handles=handles, ncol=2, loc="lower left", frameon=False, fontsize=8.5,
               bbox_to_anchor=(-0.005, 1.012), handletextpad=0.6, columnspacing=2.2,
               labelcolor=INK2)
 
-    n_keep = sum(1 for d in data if d["clip"])
+    n_kept = sum(1 for d in data if d["clip"] and d["clip"]["was"])
+    n_new = sum(1 for d in data if d["clip"] and not d["clip"]["was"])
+    n_open = sum(1 for d in data if d["clip"] is None)
     fig.text(0.04, 0.973, "GEN3_HARD after the repair: 12 levels, two clips each",
              fontsize=16, color=INK, weight="bold")
     fig.text(0.04, 0.942,
-             f"{n_keep} clips are kept exactly as they are and {len(data) - n_keep} "
-             "slots are being rebuilt. Every count re-measured at full resolution, "
-             "body pixels only.", fontsize=9, color=INK2)
+             f"{n_kept} clips kept exactly as they were, {n_new} rebuilt"
+             + (f", {n_open} slots still open" if n_open else "")
+             + ". Every count measured at full resolution, body pixels only.",
+             fontsize=9, color=INK2)
     fig.text(0.04, 0.921,
-             "The seven still to build must come out as 2 corners, 2 keeper "
-             "distributions, 2 kick-offs and 1 open play — which is what completes "
-             "5 / 5 / 5 / 9.", fontsize=9, color=INK2)
-    fig.text(0.04, 0.020,
-             "Also dropped, without leaving a gap of their own: clip 04 (measured 7, "
-             "outside the range), clip 11 and clip 18 (surplus at a level that already "
-             "held two), clip 15 (the same kick-off as clip 06).",
+             "The mix is 5 corners, 5 keeper distributions, 5 kick-offs and 9 open play; "
+             "each level has one clip starting with blue and one with red.",
+             fontsize=9, color=INK2)
+    fig.text(0.04, 0.037,
+             "The right-hand column is provenance: which clip of the previous batch this "
+             "one is, or that it was built for the repair.",
+             fontsize=7.5, color=MUTED)
+    fig.text(0.04, 0.017,
+             "clips/clip_renumbering.csv carries the same mapping, including the nine "
+             "clips that were dropped and why each one went.",
              fontsize=7.5, color=MUTED)
     out = REVIEW / "player_counts_rebuild.png"
     fig.savefig(out)
     plt.close(fig)
-    print(f"wrote {out.relative_to(HERE)}  ({n_keep} kept, {len(data) - n_keep} to build)")
+    print(f"wrote {out.relative_to(HERE)}  ({n_kept} kept, {n_new} rebuilt"
+          + (f", {n_open} open" if n_open else "") + ")")
 
 
 if __name__ == "__main__":
