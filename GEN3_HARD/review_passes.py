@@ -1,24 +1,25 @@
-"""review_passes.py — how much passing happens inside a five-second clip.
+"""review_passes.py — how often the ball changes hands while it is hidden.
 
-Writes `_review/passes.png`.
+Writes `_review/passes.png` and `_review/passes.csv`.
 
-WHAT A PASS IS HERE
-  The sweep log names the player in possession on every frame. A PASS is that name moving
-  between two players of the SAME side; a TURNOVER is it moving to the other side. Both
-  are read off the log, which is camera-independent, so a pass counts whether or not it
-  happens on screen.
+WHY THE HIDDEN WINDOW AND NOT THE WHOLE CLIP
+  The benchmark shows one second of visible ball and hides it for four. Whatever a model
+  or a person has to reason about happens in those four seconds, so that is the interval
+  the count is taken over. Over the whole five it is a different and less useful number.
 
-  A run of possession is only counted once it has lasted two frames. Without that, a ball
-  brushing past a player registers as a touch and the count inflates.
+WHAT COUNTS AS A CHANGE OF HANDS
+  The engine log names the player in possession on every frame. A change is that name
+  moving to a different player: to a TEAM-MATE is a pass, to the other side is a turnover.
+  A possession run has to last two frames before it counts, or a ball brushing past a
+  player registers as a touch and the count inflates.
 
-WHY THE NUMBERS ARE SMALL, AND WHY THAT IS THE ANSWER RATHER THAN A BUG
-  Five seconds is about one phase of play. Measured across the batch, the ball is usually
-  carried rather than exchanged — clip_22 has a single player in possession for all 125
-  frames — so most clips complete no pass at all and none completes more than one. The
-  chart therefore leads with the distribution, which is the honest shape of it, and puts
-  the per-clip detail beside it with turnovers included: a clip with no pass is not
-  necessarily a clip where nothing happened.
+THE NUMBER THIS IS REALLY REPORTING
+  Passing is almost absent: over the hidden window the batch completes 4 passes in total.
+  If passing is meant to be an independent variable — does more of it change where the
+  ball can be inferred to be — this batch cannot carry the experiment, and the histogram
+  is the clearest way to see why.
 """
+import csv
 import json
 import sys
 from collections import Counter
@@ -33,48 +34,41 @@ import gen3_lib as G                                                  # noqa: E4
 
 REVIEW = HERE / "_review"
 PICKS = G.CACHE / "picks.json"
-MIN_HOLD = 2                # frames of possession before a touch is real
+VIS = G.VIS_FRAMES          # visible for frames 0..VIS-1, hidden after
+MIN_HOLD = 2                # frames a player must hold the ball for it to count
 
 SURFACE = "#fcfcfb"
 INK = "#0b0b0b"
 INK2 = "#52514e"
 MUTED = "#898781"
 GRID = "#e1e0d9"
-S1 = "#2a78d6"          # categorical slot 1 — passes
-S2 = "#eb6834"          # categorical slot 2 — turnovers
-KIND_NAME = {"corner": "corner", "gk_throw": "keeper", "kickoff": "kick-off",
-             "open": "open play"}
-
-
-def possession_runs(log, s, e):
-    """(team, player) in possession, in order, once each run has held MIN_HOLD frames."""
-    runs, cur, n = [], None, 0
-    for t, p in zip(log["owned_team"][s:e], log["owned_player"][s:e]):
-        if t < 0:
-            cur, n = None, 0            # loose ball: the run ends, nothing is recorded
-            continue
-        key = (int(t), int(p))
-        if key == cur:
-            n += 1
-            if n == MIN_HOLD:
-                runs.append(key)
-        else:
-            cur, n = key, 1
-    return runs
+S1 = "#2a78d6"          # categorical slot 1 — passes, to a team-mate
+S2 = "#eb6834"          # categorical slot 2 — turnovers, to the other side
 
 
 def measure():
     out = []
     for p in json.loads(PICKS.read_text()):
         z = np.load(G.SWEEP / f"{p['match']}.npz")
-        runs = possession_runs({k: z[k] for k in z.files}, p["start"], p["end"])
-        pairs = list(zip(runs, runs[1:]))
-        out.append({
-            "clip": p["clip"], "kind": p["kind"],
-            "passes": sum(1 for a, b in pairs if a[0] == b[0] and a[1] != b[1]),
-            "turnovers": sum(1 for a, b in pairs if a[0] != b[0]),
-            "touches": len(runs),
-        })
+        s, e = p["start"], p["end"]
+        ot, op = z["owned_team"][s:e], z["owned_player"][s:e]
+        runs, cur, n = [], None, 0
+        for t, pl in zip(ot[VIS - 1:], op[VIS - 1:]):
+            if t < 0:
+                cur, n = None, 0
+                continue
+            key = (int(t), int(pl))
+            if key == cur:
+                n += 1
+                if n == MIN_HOLD:
+                    runs.append(key)
+            else:
+                cur, n = key, 1
+        pairs = [(a, b) for a, b in zip(runs, runs[1:]) if a != b]
+        out.append({"clip": p["clip"], "situation": p["kind"],
+                    "passes": sum(1 for a, b in pairs if a[0] == b[0]),
+                    "turnovers": sum(1 for a, b in pairs if a[0] != b[0]),
+                    "changes": len(pairs)})
     return sorted(out, key=lambda r: r["clip"])
 
 
@@ -86,90 +80,79 @@ def chart(rows):
     plt.rcParams.update({"font.family": "sans-serif", "figure.facecolor": SURFACE,
                          "savefig.facecolor": SURFACE, "text.color": INK,
                          "axes.facecolor": SURFACE})
-    fig = plt.figure(figsize=(11.4, 6.6), dpi=150)
+    xs = list(range(0, max(r["changes"] for r in rows) + 1))
+    # Each bar is split by what the changes in those clips were, so the bar height answers
+    # "how often does the ball change hands" and the colour answers "to whom" — which is
+    # the distinction the research question turns on.
+    passes = [sum(r["passes"] for r in rows if r["changes"] == x) for x in xs]
+    turns = [sum(r["turnovers"] for r in rows if r["changes"] == x) for x in xs]
+    clips = [sum(1 for r in rows if r["changes"] == x) for x in xs]
 
-    # ── the distribution: how many clips complete how many passes ──────────────
-    ax = fig.add_axes([0.055, 0.135, 0.26, 0.56])
-    hist = Counter(r["passes"] for r in rows)
-    xs = list(range(0, max(hist) + 1))
-    ys = [hist.get(x, 0) for x in xs]
-    ax.bar(xs, ys, width=0.62, color=S1)
-    for x, y in zip(xs, ys):
-        if y:
-            ax.text(x, y + 0.4, str(y), ha="center", fontsize=9, color=INK2)
-    ax.set_xticks(xs, [str(x) for x in xs], fontsize=9.5)
-    ax.set_xlabel("passes completed in the clip", fontsize=9, color=INK2, labelpad=6)
-    ax.set_ylabel("clips", fontsize=9, color=INK2)
-    ax.set_ylim(0, max(ys) * 1.22)
-    ax.set_yticks(range(0, max(ys) + 2, 4))     # clips are whole things
+    fig = plt.figure(figsize=(9.6, 5.6), dpi=150)
+    ax = fig.add_axes([0.085, 0.225, 0.88, 0.545])
+    ax.bar(xs, clips, width=0.6, color=S1)
+    for x, c in zip(xs, clips):
+        ax.text(x, c + 0.3, str(c), ha="center", fontsize=12, color=INK, weight="bold")
+    # The breakdown rides on the tick label rather than floating near the bar: a second
+    # line of text beside a bar collides with the axis the moment the bars are short.
+    labels = []
+    for x, np_, nt in zip(xs, passes, turns):
+        bits = []
+        if np_:
+            bits.append(f"{np_} pass" + ("es" if np_ > 1 else ""))
+        if nt:
+            bits.append(f"{nt} turnover" + ("s" if nt > 1 else ""))
+        # parenthesised, because "4 passes" under the bar at x=1 otherwise reads as
+        # "these clips had four passes each" rather than as the bar's composition
+        labels.append(f"{x}\n({', '.join(bits)})" if bits else str(x))
+    ax.set_xticks(xs, labels, fontsize=11)
+    ax.set_yticks(range(0, max(clips) + 3, 4))
+    ax.set_ylim(0, max(clips) * 1.18)
+    ax.set_xlim(-0.6, max(xs) + 0.6)
+    ax.set_xlabel("times the ball changes hands while it is hidden",
+                  fontsize=10, color=INK2, labelpad=12)
+    ax.set_ylabel("clips", fontsize=10, color=INK2)
     ax.yaxis.grid(True, color=GRID, lw=0.7)
     ax.set_axisbelow(True)
-    ax.tick_params(length=0, labelsize=9)
+    ax.tick_params(length=0, labelsize=10)
     for sp in ax.spines.values():
         sp.set_visible(False)
 
-    # ── the detail: which clips, and what else happened in them ────────────────
-    ax2 = fig.add_axes([0.50, 0.135, 0.455, 0.56])
-    y = np.arange(len(rows))[::-1]
-    for i, r in zip(y, rows):
-        ax2.barh(i + 0.16, r["passes"], height=0.30, color=S1)
-        ax2.barh(i - 0.16, r["turnovers"], height=0.30, color=S2)
-        if not r["passes"] and not r["turnovers"]:
-            ax2.text(0.06, i, "ball never changed hands", va="center", ha="left",
-                     fontsize=7.5, color=MUTED)
-    ax2.set_yticks(y, [f"{r['clip'].replace('clip_', 'clip ')}  {KIND_NAME[r['kind']]}"
-                       for r in rows], fontsize=7.5)
-    for t in ax2.get_yticklabels():
-        t.set_color(INK2)
-    ax2.set_xlim(0, max(max(r["passes"], r["turnovers"]) for r in rows) + 0.6)
-    ax2.set_ylim(-0.8, len(rows) - 0.2)
-    ax2.set_xticks(range(0, max(max(r["passes"], r["turnovers"]) for r in rows) + 1))
-    ax2.set_xlabel("events in the clip", fontsize=9, color=INK2, labelpad=6)
-    ax2.xaxis.grid(True, color=GRID, lw=0.7)
-    ax2.set_axisbelow(True)
-    ax2.tick_params(length=0, labelsize=9)
-    for sp in ax2.spines.values():
-        sp.set_visible(False)
-    handles = [plt.Line2D([], [], marker="s", ls="", ms=9, color=S1,
-                          label="pass — to a team-mate"),
-               plt.Line2D([], [], marker="s", ls="", ms=9, color=S2,
-                          label="turnover — to the other side")]
-    ax2.legend(handles=handles, ncol=2, loc="lower left", frameon=False, fontsize=8.5,
-               bbox_to_anchor=(-0.30, 1.01), labelcolor=INK2, handletextpad=0.6,
-               columnspacing=1.8)
-
-    tot = sum(r["passes"] for r in rows)
-    none = sum(1 for r in rows if not r["passes"])
-    fig.text(0.045, 0.945, "Passes completed inside each five-second clip",
+    tot_p = sum(r["passes"] for r in rows)
+    tot_t = sum(r["turnovers"] for r in rows)
+    fig.text(0.085, 0.935, "How often the ball changes hands while it is hidden",
              fontsize=16, color=INK, weight="bold")
-    fig.text(0.045, 0.905,
-             f"GEN3_HARD, 24 clips. {tot} passes in the batch; {none} clips complete "
-             "none and no clip completes more than one.",
+    fig.text(0.085, 0.888,
+             f"GEN3_HARD, 24 clips, over the four seconds the ball is invisible. "
+             f"{tot_p} passes and {tot_t} turnovers in the whole batch.",
              fontsize=9.5, color=INK2)
-    fig.text(0.045, 0.043,
-             "A pass is the player in possession changing to a team-mate, read from the "
-             "engine log, so it counts whether or not it happens on screen. Five seconds "
-             "is about one phase of play:",
+    fig.text(0.085, 0.855,
+             f"{clips[0]} of {len(rows)} clips: the ball never leaves the player who has "
+             "it.", fontsize=9.5, color=S2)
+    fig.text(0.085, 0.072,
+             "A change of hands is the player in possession becoming a different one, "
+             "read from the engine log, so it counts whether or not it happens",
              fontsize=7.5, color=MUTED)
-    fig.text(0.045, 0.022,
-             "the ball is usually carried rather than exchanged — in clip 22 one player "
-             "holds it for all 125 frames. Turnovers are shown beside each clip so a "
-             "quiet passing count is not mistaken for a quiet clip.",
+    fig.text(0.085, 0.050,
+             "on screen. A run of possession must last two frames to count.",
              fontsize=7.5, color=MUTED)
+    fig.text(0.085, 0.022,
+             "If passing is meant to be the variable — whether more of it changes where "
+             "the ball can be inferred to be — this batch cannot carry it.",
+             fontsize=7.5, color=INK2)
     out = REVIEW / "passes.png"
     fig.savefig(out)
     plt.close(fig)
-    print(f"wrote {out.relative_to(HERE)}  ({tot} passes over {len(rows)} clips)")
+    print(f"wrote {out.relative_to(HERE)}  ({tot_p} passes, {tot_t} turnovers, "
+          f"{clips[0]}/{len(rows)} clips with no change of hands)")
 
 
 if __name__ == "__main__":
     REVIEW.mkdir(exist_ok=True)
     rows = measure()
     chart(rows)
-    import csv
     with open(REVIEW / "passes.csv", "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=["clip", "kind", "passes", "turnovers",
-                                           "touches"])
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
-    print(f"wrote _review/passes.csv")
+    print("wrote _review/passes.csv")
