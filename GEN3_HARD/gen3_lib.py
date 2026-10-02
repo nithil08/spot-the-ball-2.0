@@ -546,7 +546,7 @@ DETECTORS = {"corner": find_corners, "kickoff": find_kickoffs, "gk_throw": find_
 
 
 # ── composition: the two visibility variants from one render pair ───────────────
-def compose_pair(vis, inv, final_fallback=None):
+def compose_pair(vis, inv, final_fallback=None, labels=True):
     """(full_visibility_frames, split_frames), grid burned in and a red circle on the
     ball's START position for the first MARK_FRAMES frames.
 
@@ -555,6 +555,11 @@ def compose_pair(vis, inv, final_fallback=None):
 
     Returns the measured start/final ball pixels too: those come from THIS render pair,
     the one that actually ships, so the ground truth cannot drift from the video.
+
+    `labels=False` draws the grid lines without the A-F / 1-16 captions, for the
+    interactive human task where the answer is a click rather than a typed cell name.
+    Nothing else changes — same windows, same red circle, same geometry — so the two
+    versions are the same clip and share one ground truth.
 
     Unlike the plate pair in `ballpix`, THESE renders have all 22 players in them, so a
     player standing in front of the ball makes the visible and invisible frames identical
@@ -569,7 +574,7 @@ def compose_pair(vis, inv, final_fallback=None):
       taken with every player hidden and therefore not occludable.
     """
     from grid import build_grid, burn_grid, circle_ball, detect_ball_or_none
-    overlay = build_grid()
+    overlay = build_grid(labels=labels)
     start = None
     for i in range(min(MARK_FRAMES, len(vis))):
         start = detect_ball_or_none(vis[i], inv[i])

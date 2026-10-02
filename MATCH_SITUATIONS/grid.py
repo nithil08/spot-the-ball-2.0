@@ -30,7 +30,14 @@ def _font(size):
         return ImageFont.load_default()
 
 
-def build_grid():
+def build_grid(labels=True):
+    """The overlay. `labels=False` draws the same lines with no A-F / 1-16 captions.
+
+    The unlabelled variant is for an INTERACTIVE task, where the answer is a click on a
+    cell rather than a typed cell name — there is nothing to read, so the captions are
+    just occlusion over the top-left of the pitch. The lines are identical either way, so
+    a cell means the same thing in both and `cell_of` is still the scorer for both.
+    """
     from PIL import Image, ImageDraw
     ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     dr = ImageDraw.Draw(ov)
@@ -41,6 +48,8 @@ def build_grid():
     for r in range(ROWS + 1):
         y = int(round(r * CELL_H))
         dr.line([(0, y), (W, y)], fill=line, width=1)
+    if not labels:
+        return ov
     font = _font(13)
     for c in range(COLS):
         dr.text((int(round(c * CELL_W)) + 2, 0), str(c + 1),
